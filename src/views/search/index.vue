@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Search, FileText, Layers, ChevronDown } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+import http from '@/utils/http'
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
 type SearchMode = 'hybrid' | 'vector' | 'fulltext'
@@ -12,10 +13,8 @@ interface SearchResult {
   doc_name: string
   chunk_index: number
   content: string
-  vector_score?: number
-  bm25_score?: number
-  rrf_score?: number
   final_score: number
+  source: string   // "vector" | "keyword"
 }
 
 // ── 参数 ──────────────────────────────────────────────────────────────────────
@@ -33,65 +32,37 @@ const modeOptions: { label: string; value: SearchMode }[] = [
   { label: '全文检索', value: 'fulltext' },
 ]
 
-// ── Mock 数据 ─────────────────────────────────────────────────────────────────
-const MOCK_POOL: SearchResult[] = [
-  {
-    chunk_id: 'c-001', doc_id: 'd-1', doc_name: '系统架构设计文档.pdf', chunk_index: 2,
-    content: '系统采用双服务架构：arc-knowledge-ai 负责核心 AI 能力（文档解析、向量化、检索、问答），arc-knowledge-web 提供管理界面。两者通过 REST API 和 SSE 流式接口通信，部署解耦，可独立扩展。',
-    vector_score: 0.94, bm25_score: 0.72, rrf_score: 0.91, final_score: 0.91,
-  },
-  {
-    chunk_id: 'c-002', doc_id: 'd-1', doc_name: '系统架构设计文档.pdf', chunk_index: 5,
-    content: 'RAG 检索管道采用混合召回策略：向量检索基于 Milvus 余弦相似度，全文检索基于 Elasticsearch BM25 算法，两路结果通过 RRF（Reciprocal Rank Fusion）融合后重排序，取 Top-K 结果送入 LLM 上下文。',
-    vector_score: 0.88, bm25_score: 0.91, rrf_score: 0.89, final_score: 0.89,
-  },
-  {
-    chunk_id: 'c-003', doc_id: 'd-2', doc_name: 'API接口文档.md', chunk_index: 8,
-    content: 'POST /api/v1/chat/sessions/{id}/messages 接口支持 SSE 流式输出。请求体包含 question 字段，响应为 text/event-stream，每个 data 事件携带 {"type":"chunk","content":"..."}，结束时发送 {"type":"done","citations":[...]}。',
-    vector_score: 0.79, bm25_score: 0.85, rrf_score: 0.83, final_score: 0.83,
-  },
-  {
-    chunk_id: 'c-004', doc_id: 'd-3', doc_name: '数据库设计文档.pdf', chunk_index: 1,
-    content: 'documents 表记录文档元数据，包含 id、tenant_id、space_id、original_name、mime_type、status（pending/processing/completed/failed）、chunk_count、error_message 等字段，status 字段通过状态机流转。',
-    vector_score: 0.71, bm25_score: 0.68, rrf_score: 0.70, final_score: 0.70,
-  },
-  {
-    chunk_id: 'c-005', doc_id: 'd-2', doc_name: 'API接口文档.md', chunk_index: 3,
-    content: 'GET /api/v1/documents 返回文档列表，支持 space_id / limit / offset 分页参数。响应结构：{"items": [...], "total": N}，每条文档包含 id、original_name、mime_type、chunk_count、status、created_at 字段。',
-    vector_score: 0.66, bm25_score: 0.74, rrf_score: 0.68, final_score: 0.68,
-  },
-  {
-    chunk_id: 'c-006', doc_id: 'd-4', doc_name: '部署手册.md', chunk_index: 0,
-    content: '本地开发环境使用 Docker Compose 启动依赖服务（PostgreSQL、Redis、Milvus、Elasticsearch）。运行 docker compose up -d 后，执行 alembic upgrade head 完成数据库迁移，再启动 uvicorn app.main:app --reload。',
-    vector_score: 0.58, bm25_score: 0.63, rrf_score: 0.60, final_score: 0.60,
-  },
-]
-
 // ── 检索逻辑 ──────────────────────────────────────────────────────────────────
 async function handleSearch() {
   if (!query.value.trim()) return
   loading.value = true
   searched.value = false
 
-  await new Promise(r => setTimeout(r, 600))
+  try {
+    const data = await http.get<{ hits: any[]; chunks: any[]; total: number }>('/search', {
+      params: { q: query.value.trim(), space_id: 'default', top_k: topK.value, score_threshold: 0.0 },
+    })
 
-  // 按模式过滤分数字段，按 topK 截取
-  const pool = MOCK_POOL.slice(0, topK.value).map(r => {
-    if (mode.value === 'vector') {
-      const { bm25_score: _b, rrf_score: _r, ...rest } = r
-      return { ...rest, final_score: r.vector_score ?? 0 }
-    }
-    if (mode.value === 'fulltext') {
-      const { vector_score: _v, rrf_score: _r, ...rest } = r
-      return { ...rest, final_score: r.bm25_score ?? 0 }
-    }
-    return r
-  })
+    // chunks 按 chunk_id 建立索引，方便合并
+    const chunkMap = new Map(data.chunks.map((c: any) => [c.chunk_id, c]))
 
-  results.value = pool.sort((a, b) => b.final_score - a.final_score)
-  expandedIds.value = []
-  loading.value = false
-  searched.value = true
+    results.value = data.hits.map((hit: any) => {
+      const chunk = chunkMap.get(hit.chunk_id) ?? {}
+      return {
+        chunk_id:    hit.chunk_id,
+        doc_id:      hit.document_id,
+        doc_name:    hit.document_id,
+        chunk_index: hit.chunk_index,
+        content:     chunk.content ?? '',
+        final_score: hit.score,
+        source:      hit.source ?? 'vector',
+      } as SearchResult
+    })
+  } finally {
+    expandedIds.value = []
+    loading.value = false
+    searched.value = true
+  }
 }
 
 function toggleExpand(id: string) {
@@ -266,26 +237,14 @@ function scoreBar(score: number) {
             <!-- 切片内容 -->
             <p class="px-4 py-3 text-sm text-zinc-600 leading-relaxed">{{ result.content }}</p>
 
-            <!-- 分数明细 -->
+            <!-- 来源标签 -->
             <div class="px-4 pb-3 flex flex-wrap gap-3">
-              <template v-if="result.vector_score !== undefined">
-                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-600 text-xs">
-                  <span class="font-medium">向量分</span>
-                  <span>{{ result.vector_score.toFixed(3) }}</span>
-                </div>
-              </template>
-              <template v-if="result.bm25_score !== undefined">
-                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50 text-amber-600 text-xs">
-                  <span class="font-medium">BM25 分</span>
-                  <span>{{ result.bm25_score.toFixed(3) }}</span>
-                </div>
-              </template>
-              <template v-if="result.rrf_score !== undefined">
-                <div class="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-600 text-xs">
-                  <span class="font-medium">RRF 融合</span>
-                  <span>{{ result.rrf_score.toFixed(3) }}</span>
-                </div>
-              </template>
+              <div
+                :class="result.source === 'vector' ? 'bg-indigo-50 text-indigo-600' : 'bg-amber-50 text-amber-600'"
+                class="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+              >
+                {{ result.source === 'vector' ? '向量检索' : '关键词检索' }}
+              </div>
             </div>
           </div>
         </div>
