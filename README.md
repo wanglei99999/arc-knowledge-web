@@ -69,9 +69,9 @@ src/
 
 本项目配套后端为 [arc-knowledge-ai](https://github.com/wanglei99999/arc-knowledge-ai)（Python FastAPI）。
 
-当前问答、统计大屏、检索调试页使用 Mock 数据，文档管理页已对接真实接口。待后端接口就绪后，替换以下文件即可完成联调：
-
-- `src/api/chat.ts` → 对接 `GET/POST/DELETE /sessions`
-- `src/utils/sse.ts` → 对接 `POST /sessions/{id}/messages`（SSE 流式）
-- `src/views/dashboard` → 对接 `GET /admin/stats`
-- `src/views/search` → 对接 `POST /search`
+| 页面/模块 | 状态 | 接口 |
+|----------|------|------|
+| 文档管理 | ✅ 已对接 | `GET/POST/DELETE /documents` |
+| 智能问答 | ✅ 已对接 | `GET/POST/DELETE /sessions`、`POST /chat`（SSE） |
+| 检索调试 | ✅ 已对接 | `GET /search` |
+| 概览大屏 | ⏳ Mock 数据 | 待后端提供统计接口 |

@@ -1,8 +1,13 @@
 export type DocumentStatus =
   | 'pending'
-  | 'processing'
-  | 'completed'
+  | 'parsing'
+  | 'parsed'
+  | 'chunking'
+  | 'chunked'
+  | 'embedding'
+  | 'indexed'
   | 'failed'
+  | 'stale'
   | 'deleting'
   | 'deleted'
 
