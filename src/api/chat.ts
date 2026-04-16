@@ -1,5 +1,5 @@
 import http from '@/utils/http'
-import type { SessionVO, MessageVO } from '@/types/chat'
+import type { SessionVO, MessageVO, Citation } from '@/types/chat'
 
 interface SessionOut {
   session_id: string
@@ -12,6 +12,7 @@ interface MessageOut {
   message_id: string
   role: string
   content: string
+  citations?: Citation[]
 }
 
 function toSessionVO(s: SessionOut): SessionVO {
@@ -31,6 +32,7 @@ function toMessageVO(m: MessageOut): MessageVO {
     role: m.role as 'user' | 'assistant',
     content: m.content,
     created_at: new Date().toISOString(),
+    citations: m.citations ?? [],
   }
 }
 
