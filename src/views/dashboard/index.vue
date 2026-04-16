@@ -124,11 +124,11 @@ interface Task {
 }
 
 const recentTasks: Task[] = [
-  { name: '产品设计规范v2.pdf',    status: 'completed',  chunks: 124, time: '2026-04-14 18:30' },
-  { name: '研发流程手册.docx',      status: 'completed',  chunks: 87,  time: '2026-04-14 16:12' },
-  { name: '竞品分析报告Q1.pdf',     status: 'processing', chunks: 0,   time: '2026-04-14 15:50' },
+  { name: '产品设计规范v2.pdf',    status: 'indexed',    chunks: 124, time: '2026-04-14 18:30' },
+  { name: '研发流程手册.docx',      status: 'indexed',    chunks: 87,  time: '2026-04-14 16:12' },
+  { name: '竞品分析报告Q1.pdf',     status: 'embedding',  chunks: 0,   time: '2026-04-14 15:50' },
   { name: '用户访谈记录合集.txt',   status: 'failed',     chunks: 0,   time: '2026-04-14 14:22' },
-  { name: '技术架构说明.md',        status: 'completed',  chunks: 43,  time: '2026-04-14 10:05' },
+  { name: '技术架构说明.md',        status: 'indexed',    chunks: 43,  time: '2026-04-14 10:05' },
 ]
 
 // ── 知识空间 ──────────────────────────────────────────────────────────────────
