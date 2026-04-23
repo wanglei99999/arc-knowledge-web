@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { use } from 'echarts/core'
 import { CanvasRenderer } from 'echarts/renderers'
 import { LineChart } from 'echarts/charts'
@@ -6,11 +7,13 @@ import { GridComponent, TooltipComponent } from 'echarts/components'
 import VChart from 'vue-echarts'
 import {
   FileText, Layers, MessageSquare, HardDrive,
-  RefreshCw, Boxes
+  RefreshCw, Boxes, Trash2
 } from 'lucide-vue-next'
+import { message } from 'ant-design-vue'
 import dayjs from 'dayjs'
 import StatusBadge from '@/components/document/StatusBadge.vue'
 import type { DocumentStatus } from '@/types/document'
+import http from '@/utils/http'
 
 use([CanvasRenderer, LineChart, GridComponent, TooltipComponent])
 
@@ -131,6 +134,33 @@ const recentTasks: Task[] = [
   { name: '技术架构说明.md',        status: 'indexed',    chunks: 43,  time: '2026-04-14 10:05' },
 ]
 
+// ── Dev Reset ────────────────────────────────────────────────────────────────
+const resetting = ref(false)
+
+async function devReset() {
+  if (!window.confirm('⚠️ 即将清空所有存储数据（PG / Milvus / ES / MinIO），确认继续？')) return
+  resetting.value = true
+  try {
+    const result = await http.post<{
+      status: string
+      cleared: {
+        postgres_rows: number
+        milvus_chunk_vectors: number
+        milvus_memory_vectors: number
+        elasticsearch_docs: number
+        minio_objects: number
+      }
+    }>('/admin/dev/reset')
+    const c = result.cleared
+    message.success(
+      `清空完成：PG ${c.postgres_rows} 行 / Milvus ${c.milvus_chunk_vectors + c.milvus_memory_vectors} 向量 / ES ${c.elasticsearch_docs} 文档 / MinIO ${c.minio_objects} 文件`,
+      5,
+    )
+  } finally {
+    resetting.value = false
+  }
+}
+
 // ── 知识空间 ──────────────────────────────────────────────────────────────────
 const spaces = [
   {
@@ -162,10 +192,20 @@ const spaces = [
         <h1 class="text-2xl font-semibold text-zinc-800">概览</h1>
         <p class="mt-0.5 text-sm text-zinc-400">数据每 5 分钟刷新一次</p>
       </div>
-      <button class="flex items-center gap-1.5 px-3 py-2 rounded-button text-sm text-zinc-500 hover:bg-surface-muted transition-colors">
-        <RefreshCw class="w-3.5 h-3.5" />
-        刷新
-      </button>
+      <div class="flex items-center gap-2">
+        <button class="flex items-center gap-1.5 px-3 py-2 rounded-button text-sm text-zinc-500 hover:bg-surface-muted transition-colors">
+          <RefreshCw class="w-3.5 h-3.5" />
+          刷新
+        </button>
+        <button
+          :disabled="resetting"
+          class="flex items-center gap-1.5 px-3 py-2 rounded-button text-sm text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          @click="devReset"
+        >
+          <Trash2 class="w-3.5 h-3.5" />
+          {{ resetting ? '清空中…' : '清空数据' }}
+        </button>
+      </div>
     </div>
 
     <!-- 统计卡片 -->
