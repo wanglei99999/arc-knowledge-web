@@ -10,7 +10,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   send: [content: string]
-  stop: []
+  stop: [] 
 }>()
 
 const text = ref('')
