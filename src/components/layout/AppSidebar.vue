@@ -6,6 +6,7 @@ import {
   FileText,
   MessageSquare,
   Search,
+  Settings,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -16,10 +17,11 @@ const route = useRoute()
 const appStore = useAppStore()
 
 const navItems = [
-  { path: '/',           icon: LayoutDashboard, label: '概览'     },
-  { path: '/documents',  icon: FileText,         label: '文档管理' },
-  { path: '/chat',       icon: MessageSquare,    label: '智能问答' },
-  { path: '/search',     icon: Search,           label: '检索调试' },
+  { path: '/',          icon: LayoutDashboard, label: '概览'     },
+  { path: '/documents', icon: FileText,         label: '文档管理' },
+  { path: '/chat',      icon: MessageSquare,    label: '智能问答' },
+  { path: '/search',    icon: Search,           label: '检索调试' },
+  { path: '/admin',     icon: Settings,         label: '管理配置' },
 ]
 
 const isActive = (path: string) =>
