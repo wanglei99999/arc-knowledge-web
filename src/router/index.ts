@@ -28,6 +28,11 @@ const router = createRouter({
           name: 'search',
           component: () => import('@/views/search/index.vue'),
         },
+        {
+          path: 'admin',
+          name: 'admin',
+          component: () => import('@/views/admin/index.vue'),
+        },
       ],
     },
   ],
