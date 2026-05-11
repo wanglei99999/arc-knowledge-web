@@ -63,10 +63,22 @@
 
 ## Phase 4：概览大屏 ✅ 已实现（Mock 数据）
 
-**目标**：展示平台核心指标，让管理员一眼掌握系统状态。
+**目标**：展示平台核心指标，让管理员一眼掌握系统状态。保留 Mock 数据用于演示，真实数据由 /admin 页承载（见 ADR-044）。
 
-- [x] 4 个统计卡片（文档数 / 切片数 / 对话数 / 存储量）
-- [x] 7 天对话趋势折线图（ECharts + vue-echarts）
+- [x] 4 个统计卡片（文档数 / 切片数 / 对话数 / 存储量，Mock）
+- [x] 7 天对话趋势折线图（ECharts + vue-echarts，Mock）
 - [x] 入库任务最近记录列表
 - [x] 知识空间卡片列表
-- [ ] 后端补充统计接口（待对接 arc-knowledge-ai）
+
+---
+
+## Phase 5：Admin 管理页 ✅ 已实现（真实数据）
+
+**目标**：运营管理入口，展示真实系统数据，提供模型定价和租户配置管理。
+
+- [x] `src/api/admin.ts`：Admin API 函数层（getAdminStats / getTenantUsage / listModelConfigs / upsertModelConfig / deleteModelConfig / getTenantConfig / updateTenantConfig）
+- [x] 顶部真实统计卡片（文档数 / 切片数 / 会话数 / 存储量，对接 `GET /admin/stats`）
+- [x] 7 天 Token 消耗趋势图（对接 `GET /admin/tenants/{id}/usage?group_by=day`）
+- [x] 模型定价 CRUD（表格展示 + 新增弹窗 + 删除确认）
+- [x] 租户 LLM 配置表单（provider 下拉 + model 输入 + allowed_models 标签）
+- [x] 侧边栏"管理配置"导航入口，路由 `/admin`
