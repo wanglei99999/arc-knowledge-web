@@ -1,9 +1,12 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useRoute } from 'vue-router'
-import { Bell } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { Bell, LogOut, ChevronDown } from 'lucide-vue-next'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
+const router = useRouter()
+const authStore = useAuthStore()
 
 const breadcrumbMap: Record<string, string> = {
   '/':          '概览',
@@ -13,6 +16,13 @@ const breadcrumbMap: Record<string, string> = {
 }
 
 const currentTitle = computed(() => breadcrumbMap[route.path] ?? '')
+
+const dropdownOpen = ref(false)
+
+async function handleLogout() {
+  await authStore.logout()
+  router.push({ name: 'login' })
+}
 </script>
 
 <template>
@@ -30,13 +40,40 @@ const currentTitle = computed(() => breadcrumbMap[route.path] ?? '')
         <Bell class="w-4 h-4" />
       </button>
 
-      <!-- 用户头像（MVP 硬编码） -->
-      <div class="flex items-center gap-2">
-        <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-semibold">
-          D
+      <!-- 用户区域：点击展开退出登录下拉 -->
+      <div class="relative">
+        <button
+          class="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-surface-muted transition-colors"
+          @click="dropdownOpen = !dropdownOpen"
+        >
+          <!-- 头像：首字母 -->
+          <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-semibold">
+            {{ authStore.avatarLetter }}
+          </div>
+          <span class="text-sm text-zinc-600 font-medium">{{ authStore.displayName }}</span>
+          <ChevronDown class="w-3 h-3 text-zinc-400" :class="{ 'rotate-180': dropdownOpen }" />
+        </button>
+
+        <!-- 下拉菜单 -->
+        <div
+          v-if="dropdownOpen"
+          class="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-lg border border-zinc-100 py-1 z-50"
+        >
+          <div class="px-3 py-2 border-b border-zinc-100">
+            <p class="text-xs text-zinc-400 truncate">{{ authStore.email }}</p>
+          </div>
+          <button
+            class="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+            @click="handleLogout"
+          >
+            <LogOut class="w-4 h-4" />
+            退出登录
+          </button>
         </div>
-        <span class="text-sm text-zinc-600 font-medium">dev-user</span>
       </div>
     </div>
   </header>
+
+  <!-- 点击外部关闭下拉 -->
+  <div v-if="dropdownOpen" class="fixed inset-0 z-40" @click="dropdownOpen = false" />
 </template>
