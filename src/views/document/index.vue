@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { RefreshCw, FileText, Layers } from 'lucide-vue-next'
 import dayjs from 'dayjs'
@@ -26,6 +26,25 @@ async function fetchDocuments() {
 
 onMounted(fetchDocuments)
 
+// ── 处理进度轮询 ──────────────────────────────────────────────────────────────
+const TERMINAL_STATUSES = new Set(['indexed', 'failed', 'deleted'])
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+function startPolling() {
+  if (pollTimer) return
+  pollTimer = setInterval(async () => {
+    await fetchDocuments()
+    if (documents.value.every(d => TERMINAL_STATUSES.has(d.status))) stopPolling()
+  }, 3000)
+}
+
+function stopPolling() {
+  if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
+}
+
+onUnmounted(stopPolling)
+
 // ── 上传 ─────────────────────────────────────────────────────────────────────
 interface UploadTask { file: File; progress: number; status: 'uploading' | 'done' | 'error' }
 const uploadTasks = ref<UploadTask[]>([])
@@ -45,10 +64,11 @@ async function handleUpload(files: File[]) {
     }
   }
 
-  // 上传完成后刷新列表
-  setTimeout(() => {
+  // 上传完成后刷新列表，并在有文档处理中时启动轮询
+  setTimeout(async () => {
     uploadTasks.value = uploadTasks.value.filter(t => t.status !== 'done')
-    fetchDocuments()
+    await fetchDocuments()
+    if (documents.value.some(d => !TERMINAL_STATUSES.has(d.status))) startPolling()
   }, 1500)
 }
 
