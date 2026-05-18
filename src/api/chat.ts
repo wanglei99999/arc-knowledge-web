@@ -36,13 +36,14 @@ function toMessageVO(m: MessageOut): MessageVO {
   }
 }
 
-export async function listSessions(): Promise<SessionVO[]> {
-  const data = await http.get<SessionOut[]>('/sessions')
+export async function listSessions(spaceId?: string): Promise<SessionVO[]> {
+  const params = spaceId ? { space_id: spaceId } : undefined
+  const data = await http.get<SessionOut[]>('/sessions', { params })
   return data.map(toSessionVO)
 }
 
-export async function createSession(title = '新会话'): Promise<SessionVO> {
-  const data = await http.post<SessionOut>('/sessions', { title })
+export async function createSession(title = '新会话', spaceId?: string): Promise<SessionVO> {
+  const data = await http.post<SessionOut>('/sessions', { title, space_id: spaceId })
   return toSessionVO(data)
 }
 

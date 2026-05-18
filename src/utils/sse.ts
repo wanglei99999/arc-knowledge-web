@@ -1,4 +1,5 @@
 import { useAppStore } from '@/stores/app'
+import { useSpacesStore } from '@/stores/spaces'
 import type { Citation } from '@/types/chat'
 
 export interface StreamCallbacks {
@@ -16,6 +17,7 @@ export function streamChat(
 ): () => void {
   const controller = new AbortController()
   const appStore = useAppStore()
+  const spacesStore = useSpacesStore()
 
   ;(async () => {
     try {
@@ -28,7 +30,7 @@ export function streamChat(
         },
         body: JSON.stringify({
           query: question,
-          space_id: 'default',
+          space_id: spacesStore.currentSpace?.space_key ?? 'default',
           session_id: sessionId,
           top_k: 10,
           score_threshold: 0.0,

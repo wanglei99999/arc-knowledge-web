@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import http from '@/utils/http'
 import { debugSearch } from '@/api/search'
 import type { DebugResult, DebugHit } from '@/api/search'
+import { useSpacesStore } from '@/stores/spaces'
 
 // ── 类型 ──────────────────────────────────────────────────────────────────────
 type SearchMode = 'hybrid' | 'vector' | 'fulltext'
@@ -18,6 +19,8 @@ interface SearchResult {
   final_score: number
   source: string
 }
+
+const spacesStore = useSpacesStore()
 
 // ── 简单模式状态 ──────────────────────────────────────────────────────────────
 const query      = ref('')
@@ -91,7 +94,7 @@ async function handleSearch() {
       })
     } else {
       const data = await http.get<{ hits: any[]; chunks: any[]; total: number }>('/search', {
-        params: { q: query.value.trim(), space_id: 'default', top_k: topK.value, score_threshold: 0.0 },
+        params: { q: query.value.trim(), space_id: spacesStore.currentSpace?.space_key ?? 'default', top_k: topK.value, score_threshold: 0.0 },
       })
       const chunkMap = new Map(data.chunks.map((c: any) => [c.chunk_id, c]))
       results.value = data.hits.map((hit: any) => {
