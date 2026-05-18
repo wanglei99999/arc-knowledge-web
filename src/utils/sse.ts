@@ -1,4 +1,5 @@
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
 import { useSpacesStore } from '@/stores/spaces'
 import type { Citation } from '@/types/chat'
 
@@ -17,20 +18,26 @@ export function streamChat(
 ): () => void {
   const controller = new AbortController()
   const appStore = useAppStore()
+  const authStore = useAuthStore()
   const spacesStore = useSpacesStore()
 
   ;(async () => {
     try {
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'X-Tenant-Id': appStore.tenantId,
+      }
+      if (authStore.accessToken) {
+        headers['Authorization'] = `Bearer ${authStore.accessToken}`
+      }
+
       const res = await fetch(`${API_BASE}/chat`, {
         method: 'POST',
         signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Tenant-Id': appStore.tenantId,
-        },
+        headers,
         body: JSON.stringify({
           query: question,
-          space_id: spacesStore.currentSpace?.space_key ?? 'default',
+          space_id: spacesStore.currentSpace?.space_id ?? '',
           session_id: sessionId,
           top_k: 10,
           score_threshold: 0.0,
