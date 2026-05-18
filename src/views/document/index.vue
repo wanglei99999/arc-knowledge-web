@@ -19,7 +19,7 @@ const loading   = ref(false)
 async function fetchDocuments() {
   loading.value = true
   try {
-    const res = await listDocuments({ space_id: spacesStore.currentSpace?.space_key ?? 'default', limit: 50 })
+    const res = await listDocuments({ space_id: spacesStore.currentSpace?.space_id ?? '', limit: 50 })
     documents.value = (res as any).items ?? []
     total.value     = (res as any).total ?? 0
   } finally {
@@ -47,7 +47,7 @@ function stopPolling() {
 }
 
 onUnmounted(stopPolling)
-watch(() => spacesStore.currentSpace, fetchDocuments)
+watch(() => spacesStore.currentSpace?.space_id, fetchDocuments)
 
 // ── 上传 ─────────────────────────────────────────────────────────────────────
 interface UploadTask { file: File; progress: number; status: 'uploading' | 'done' | 'error' }
@@ -59,7 +59,7 @@ async function handleUpload(files: File[]) {
     uploadTasks.value.push(task)
 
     try {
-      await uploadDocument(file, spacesStore.currentSpace?.space_key ?? 'default', (pct) => { task.progress = pct })
+      await uploadDocument(file, spacesStore.currentSpace?.space_id ?? '', (pct) => { task.progress = pct })
       task.status = 'done'
       message.success(`${file.name} 上传成功，正在入库处理`)
     } catch {

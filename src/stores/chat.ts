@@ -127,7 +127,16 @@ export const useChatStore = defineStore('chat', () => {
     isStreaming.value = false
   }
 
-  watch(() => spacesStore.currentSpace, async () => {
+  watch(() => spacesStore.currentSpace?.space_id, async (newId, oldId) => {
+    if (!newId || newId === oldId) return
+
+    if (!oldId) {
+      // 首次 space 加载：只刷新 sessions 列表，不清空已加载的消息
+      sessions.value = await listSessions(newId)
+      return
+    }
+
+    // 用户主动切换 space：全量重置
     activeSessionId.value = null
     messages.value = []
     await fetchSessions()
