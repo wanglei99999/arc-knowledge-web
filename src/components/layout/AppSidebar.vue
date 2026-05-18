@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useSpacesStore } from '@/stores/spaces'
 import {
   LayoutDashboard,
   FileText,
@@ -10,11 +12,15 @@ import {
   ChevronLeft,
   ChevronRight,
   Database,
+  Layers,
+  ChevronDown,
+  Plus,
 } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 
 const route = useRoute()
 const appStore = useAppStore()
+const spacesStore = useSpacesStore()
 
 const navItems = [
   { path: '/',          icon: LayoutDashboard, label: '概览'     },
@@ -26,6 +32,34 @@ const navItems = [
 
 const isActive = (path: string) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
+
+//空间切换器
+const dropdownOpen = ref(false)
+const newSpaceName = ref('')
+const creating = ref(false)
+function toggleDropdown(){
+  dropdownOpen.value = !dropdownOpen.value
+  newSpaceName.value = ''
+}
+
+function selectSpace(key: string){
+  spacesStore.switchSpace(key)
+  dropdownOpen.value = false
+}
+
+async function handleCreate(){
+  const name = newSpaceName.value.trim()
+  if(!name||creating.value) return 
+  creating.value = true
+  try{
+    await spacesStore.createSpace(name)
+    dropdownOpen.value = false
+  } finally{
+    creating.value = false
+    newSpaceName.value = ''
+  }
+}
+
 </script>
 
 <template>
@@ -46,6 +80,63 @@ const isActive = (path: string) =>
       >
         ArcKnowledge
       </span>
+    </div>
+
+    <!-- 空间切换器 -->
+    <div class="relative px-2 py-2 border-b border-sidebar-border shrink-0">
+      <button
+        :class="cn(
+          'flex items-center w-full rounded-lg px-3 py-2 text-sidebar-text hover:bg-sidebar-hover hover:text-white transition-colors',
+          appStore.sidebarCollapsed ? 'justify-center' : 'gap-2'
+        )"
+        @click="toggleDropdown"
+      >
+        <Layers class="w-4 h-4 shrink-0" />
+        <span v-if="!appStore.sidebarCollapsed" class="flex-1 text-left text-sm truncate">
+          {{ spacesStore.currentSpace?.name ?? '选择空间' }}
+        </span>
+        <ChevronDown v-if="!appStore.sidebarCollapsed" class="w-3 h-3 shrink-0" />
+      </button>
+
+      <!-- 下拉菜单 -->
+      <template v-if="dropdownOpen">
+        <!-- 遮罩 -->
+        <div class="fixed inset-0 z-10" @click="dropdownOpen = false" />
+        <!-- 菜单内容 -->
+        <div class="absolute left-2 right-2 top-full mt-1 z-20 bg-gray-800 border border-gray-600 rounded-lg shadow-xl overflow-hidden">
+          <div
+            v-for="s in spacesStore.spaces"
+            :key="s.space_key"
+            :class="cn(
+              'flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors',
+              s.space_key === spacesStore.currentSpace?.space_key
+                ? 'bg-primary text-white'
+                : 'text-gray-300 hover:bg-gray-700'
+            )"
+            @click="selectSpace(s.space_key)"
+          >
+            <span class="flex-1 truncate">{{ s.name }}</span>
+          </div>
+
+          <div class="border-t border-gray-600 p-2">
+            <div class="flex gap-1">
+              <input
+                v-model="newSpaceName"
+                class="flex-1 bg-gray-700 text-white text-sm rounded px-2 py-1 outline-none placeholder-gray-400"
+                placeholder="新建空间..."
+                @keyup.enter="handleCreate"
+              />
+              <button
+                class="flex items-center justify-center w-7 h-7 rounded bg-primary hover:bg-primary/80 text-white transition-colors disabled:opacity-50"
+                :disabled="!newSpaceName.trim() || creating"
+                @click="handleCreate"
+              >
+                <Plus class="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </template>
     </div>
 
     <!-- 导航项 -->

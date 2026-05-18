@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted,watch } from 'vue'
 import { message, Modal } from 'ant-design-vue'
 import { RefreshCw, FileText, Layers } from 'lucide-vue-next'
 import dayjs from 'dayjs'
@@ -7,6 +7,9 @@ import UploadZone from '@/components/document/UploadZone.vue'
 import StatusBadge from '@/components/document/StatusBadge.vue'
 import { listDocuments, uploadDocument, deleteDocument, listChunks } from '@/api/document'
 import type { DocumentVO, ChunkVO } from '@/types/document'
+import { useSpacesStore } from '@/stores/spaces'
+
+const spacesStore = useSpacesStore()
 
 // ── 文档列表 ────────────────────────────────────────────────────────────────
 const documents = ref<DocumentVO[]>([])
@@ -16,7 +19,7 @@ const loading   = ref(false)
 async function fetchDocuments() {
   loading.value = true
   try {
-    const res = await listDocuments({ space_id: 'default', limit: 50 })
+    const res = await listDocuments({ space_id: spacesStore.currentSpace?.space_key ?? 'default', limit: 50 })
     documents.value = (res as any).items ?? []
     total.value     = (res as any).total ?? 0
   } finally {
@@ -44,6 +47,7 @@ function stopPolling() {
 }
 
 onUnmounted(stopPolling)
+watch(() => spacesStore.currentSpace, fetchDocuments)
 
 // ── 上传 ─────────────────────────────────────────────────────────────────────
 interface UploadTask { file: File; progress: number; status: 'uploading' | 'done' | 'error' }
@@ -55,7 +59,7 @@ async function handleUpload(files: File[]) {
     uploadTasks.value.push(task)
 
     try {
-      await uploadDocument(file, 'default', (pct) => { task.progress = pct })
+      await uploadDocument(file, spacesStore.currentSpace?.space_key ?? 'default', (pct) => { task.progress = pct })
       task.status = 'done'
       message.success(`${file.name} 上传成功，正在入库处理`)
     } catch {

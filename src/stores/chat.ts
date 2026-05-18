@@ -1,11 +1,13 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { message } from 'ant-design-vue'
 import { listSessions, createSession, deleteSession, listMessages } from '@/api/chat'
 import { streamChat } from '@/utils/sse'
 import type { SessionVO, MessageVO } from '@/types/chat'
+import { useSpacesStore } from '@/stores/spaces'
 
 export const useChatStore = defineStore('chat', () => {
+  const spacesStore = useSpacesStore()
   const sessions = ref<SessionVO[]>([])
   const activeSessionId = ref<string | null>(null)
   const messages = ref<MessageVO[]>([])
@@ -17,7 +19,7 @@ export const useChatStore = defineStore('chat', () => {
   async function fetchSessions() {
     sessionsLoading.value = true
     try {
-      sessions.value = await listSessions()
+      sessions.value = await listSessions(spacesStore.currentSpace?.space_id)
       if (sessions.value.length && !activeSessionId.value) {
         await switchSession(sessions.value[0].id)
       }
@@ -38,7 +40,8 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function newSession() {
-    const session = await createSession()
+    const session = await createSession('新会话', spacesStore.currentSpace?.space_id)
+    sessions.value = [session, ...sessions.value]
     await switchSession(session.id)
   }
 
@@ -123,6 +126,12 @@ export const useChatStore = defineStore('chat', () => {
     }
     isStreaming.value = false
   }
+
+  watch(() => spacesStore.currentSpace, async () => {
+    activeSessionId.value = null
+    messages.value = []
+    await fetchSessions()
+  })
 
   return {
     sessions,
