@@ -2,6 +2,7 @@ import http from '@/utils/http'
 
 export interface DebugSearchRequest {
   query: string
+  space_id?: string
   top_k?: number
   score_threshold?: number
   query_rewrite_enabled?: boolean

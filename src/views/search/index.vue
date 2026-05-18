@@ -90,11 +90,12 @@ async function handleSearch() {
     if (debugMode.value) {
       debugResult.value = await debugSearch({
         query: query.value.trim(),
+        space_id: spacesStore.currentSpace?.space_id ?? '',
         ...debugParams.value,
       })
     } else {
       const data = await http.get<{ hits: any[]; chunks: any[]; total: number }>('/search', {
-        params: { q: query.value.trim(), space_id: spacesStore.currentSpace?.space_key ?? 'default', top_k: topK.value, score_threshold: 0.0 },
+        params: { q: query.value.trim(), space_id: spacesStore.currentSpace?.space_id ?? '', top_k: topK.value, score_threshold: 0.0 },
       })
       const chunkMap = new Map(data.chunks.map((c: any) => [c.chunk_id, c]))
       results.value = data.hits.map((hit: any) => {

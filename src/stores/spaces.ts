@@ -5,10 +5,10 @@ import type { SpaceVO } from '@/types/space'
 
 export const useSpacesStore = defineStore('spaces', () => {
     const spaces = ref<SpaceVO[]>([])
-    const currentSpaceKey = ref(localStorage.getItem('current_space_key') ?? 'default')
+    const currentSpaceId = ref(localStorage.getItem('current_space_id') ?? '')
 
     const currentSpace = computed<SpaceVO | null>(() =>
-        spaces.value.find(s => s.space_key === currentSpaceKey.value)
+        spaces.value.find(s => s.space_id === currentSpaceId.value)
         ?? spaces.value[0] ?? null
     )
 
@@ -16,15 +16,15 @@ export const useSpacesStore = defineStore('spaces', () => {
         spaces.value = await listSpaces()
     }
 
-    function switchSpace(key: string) {
-        currentSpaceKey.value = key
-        localStorage.setItem('current_space_key', key)
+    function switchSpace(id: string) {
+        currentSpaceId.value = id
+        localStorage.setItem('current_space_id', id)
     }
 
     async function createSpace(name: string) {
         const space = await apiCreateSpace(name)
         spaces.value.push(space)
-        switchSpace(space.space_key)
+        switchSpace(space.space_id)
         return space
     }
 
