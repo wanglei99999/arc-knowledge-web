@@ -42,8 +42,8 @@ function toggleDropdown(){
   newSpaceName.value = ''
 }
 
-function selectSpace(key: string){
-  spacesStore.switchSpace(key)
+function selectSpace(id: string){
+  spacesStore.switchSpace(id)
   dropdownOpen.value = false
 }
 
@@ -106,14 +106,14 @@ async function handleCreate(){
         <div class="absolute left-2 right-2 top-full mt-1 z-20 bg-gray-800 border border-gray-600 rounded-lg shadow-xl overflow-hidden">
           <div
             v-for="s in spacesStore.spaces"
-            :key="s.space_key"
+            :key="s.space_id"
             :class="cn(
               'flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors',
-              s.space_key === spacesStore.currentSpace?.space_key
+              s.space_id === spacesStore.currentSpace?.space_id
                 ? 'bg-primary text-white'
                 : 'text-gray-300 hover:bg-gray-700'
             )"
-            @click="selectSpace(s.space_key)"
+            @click="selectSpace(s.space_id)"
           >
             <span class="flex-1 truncate">{{ s.name }}</span>
           </div>
