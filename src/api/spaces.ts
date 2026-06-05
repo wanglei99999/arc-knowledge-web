@@ -6,3 +6,6 @@ export const listSpaces = () =>
 
 export const createSpace = (name: string) =>
     http.post<SpaceVO>('/spaces', { name })
+
+export const deleteSpace = (space_id: string) =>
+    http.delete(`/spaces/${space_id}`)
