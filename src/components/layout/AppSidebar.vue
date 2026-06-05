@@ -15,7 +15,9 @@ import {
   Layers,
   ChevronDown,
   Plus,
+  Trash2,
 } from 'lucide-vue-next'
+import { Modal, message } from 'ant-design-vue'
 import { cn } from '@/lib/utils'
 
 const route = useRoute()
@@ -45,6 +47,21 @@ function toggleDropdown(){
 function selectSpace(id: string){
   spacesStore.switchSpace(id)
   dropdownOpen.value = false
+}
+
+function confirmDeleteSpace(e: Event, spaceId: string, spaceName: string) {
+  e.stopPropagation()
+  Modal.confirm({
+    title: '删除空间',
+    content: `确认删除「${spaceName}」？空间内的文档数据不会被删除。`,
+    okText: '确认删除',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      await spacesStore.deleteSpace(spaceId)
+      message.success('空间已删除')
+    },
+  })
 }
 
 async function handleCreate(){
@@ -108,7 +125,7 @@ async function handleCreate(){
             v-for="s in spacesStore.spaces"
             :key="s.space_id"
             :class="cn(
-              'flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors',
+              'group flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors',
               s.space_id === spacesStore.currentSpace?.space_id
                 ? 'bg-primary text-white'
                 : 'text-gray-300 hover:bg-gray-700'
@@ -116,6 +133,12 @@ async function handleCreate(){
             @click="selectSpace(s.space_id)"
           >
             <span class="flex-1 truncate">{{ s.name }}</span>
+            <button
+              class="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:text-red-400"
+              @click="confirmDeleteSpace($event, s.space_id, s.name)"
+            >
+              <Trash2 class="w-3 h-3" />
+            </button>
           </div>
 
           <div class="border-t border-gray-600 p-2">

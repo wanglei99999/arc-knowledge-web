@@ -1,6 +1,6 @@
 import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
-import { listSpaces, createSpace as apiCreateSpace } from '@/api/spaces'
+import { listSpaces, createSpace as apiCreateSpace, deleteSpace as apiDeleteSpace } from '@/api/spaces'
 import type { SpaceVO } from '@/types/space'
 
 export const useSpacesStore = defineStore('spaces', () => {
@@ -28,5 +28,13 @@ export const useSpacesStore = defineStore('spaces', () => {
         return space
     }
 
-    return { spaces, currentSpace, fetchSpaces, switchSpace, createSpace }
+    async function deleteSpace(spaceId: string) {
+        await apiDeleteSpace(spaceId)
+        spaces.value = spaces.value.filter(s => s.space_id !== spaceId)
+        if (currentSpaceId.value === spaceId) {
+            switchSpace(spaces.value[0]?.space_id ?? '')
+        }
+    }
+
+    return { spaces, currentSpace, fetchSpaces, switchSpace, createSpace, deleteSpace }
 })
