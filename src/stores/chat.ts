@@ -14,6 +14,7 @@ export const useChatStore = defineStore('chat', () => {
   const sessionsLoading = ref(false)
   const messagesLoading = ref(false)
   const isStreaming = ref(false)
+  const pendingNew = ref(false)
   let stopStream: (() => void) | null = null
 
   async function fetchSessions() {
@@ -30,6 +31,7 @@ export const useChatStore = defineStore('chat', () => {
 
   async function switchSession(id: string) {
     if (isStreaming.value) stopStream?.()
+    pendingNew.value = false
     activeSessionId.value = id
     messagesLoading.value = true
     try {
@@ -39,10 +41,12 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  async function newSession() {
-    const session = await createSession('新会话', spacesStore.currentSpace?.space_id)
-    sessions.value = [session, ...sessions.value]
-    await switchSession(session.id)
+  function newSession() {
+    if (pendingNew.value) return
+    if (isStreaming.value) stopStream?.()
+    pendingNew.value = true
+    activeSessionId.value = null
+    messages.value = []
   }
 
   async function removeSession(id: string) {
@@ -58,8 +62,8 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function sendMessage(content: string) {
-    if (!activeSessionId.value || isStreaming.value || !content.trim()) return
+  async function sendMessage(content: string) {
+    if ((!activeSessionId.value && !pendingNew.value) || isStreaming.value || !content.trim()) return
 
     const userMsg: MessageVO = {
       id: `msg-${Date.now()}`,
@@ -79,9 +83,24 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = [...messages.value, assistantMsg]
     isStreaming.value = true
 
+    // 懒创建：第一条消息发送时才建立会话
+    if (pendingNew.value) {
+      pendingNew.value = false
+      try {
+        const session = await createSession('新会话', spacesStore.currentSpace?.space_id)
+        sessions.value = [session, ...sessions.value]
+        activeSessionId.value = session.id
+      } catch (err) {
+        messages.value = messages.value.slice(0, -2)
+        isStreaming.value = false
+        pendingNew.value = true
+        message.error('创建会话失败，请重试')
+        return
+      }
+    }
+
     stopStream = streamChat(activeSessionId.value!, content, {
       onChunk(text) {
-        // Find and update in place to avoid full re-render
         const idx = messages.value.findIndex(m => m.id === assistantMsg.id)
         if (idx !== -1) {
           messages.value[idx] = { ...messages.value[idx], content: messages.value[idx].content + text }
@@ -95,7 +114,6 @@ export const useChatStore = defineStore('chat', () => {
         isStreaming.value = false
         stopStream = null
 
-        // Update session title on first question
         const session = sessions.value.find(s => s.id === activeSessionId.value)
         if (session) {
           if (session.message_count === 0) {
@@ -131,12 +149,11 @@ export const useChatStore = defineStore('chat', () => {
     if (!newId || newId === oldId) return
 
     if (!oldId) {
-      // 首次 space 加载：只刷新 sessions 列表，不清空已加载的消息
       sessions.value = await listSessions(newId)
       return
     }
 
-    // 用户主动切换 space：全量重置
+    pendingNew.value = false
     activeSessionId.value = null
     messages.value = []
     await fetchSessions()
@@ -149,6 +166,7 @@ export const useChatStore = defineStore('chat', () => {
     sessionsLoading,
     messagesLoading,
     isStreaming,
+    pendingNew,
     fetchSessions,
     switchSession,
     newSession,

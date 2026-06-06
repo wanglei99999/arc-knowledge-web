@@ -45,6 +45,18 @@ function confirmDelete(id: string, title: string, e: MouseEvent) {
       </div>
 
       <template v-else>
+        <!-- 待创建的临时会话 -->
+        <div
+          v-if="store.pendingNew"
+          class="group relative flex items-start gap-2.5 px-3 py-2.5 rounded-lg bg-primary/10 text-primary cursor-default"
+        >
+          <MessageSquare class="w-3.5 h-3.5 mt-0.5 shrink-0 opacity-60" />
+          <div class="flex-1 min-w-0">
+            <p class="text-sm font-medium truncate leading-tight">新会话</p>
+            <p class="text-xs text-primary/50 mt-0.5">发送消息后创建</p>
+          </div>
+        </div>
+
         <div
           v-for="session in store.sessions"
           :key="session.id"
@@ -73,7 +85,7 @@ function confirmDelete(id: string, title: string, e: MouseEvent) {
         </div>
 
         <div
-          v-if="!store.sessions.length"
+          v-if="!store.sessions.length && !store.pendingNew"
           class="flex flex-col items-center justify-center py-12 gap-2 text-zinc-400"
         >
           <MessageSquare class="w-8 h-8 opacity-30" />

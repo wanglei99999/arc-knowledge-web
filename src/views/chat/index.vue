@@ -65,9 +65,9 @@ onMounted(async () => {
           <a-spin />
         </div>
 
-        <!-- 空状态 -->
+        <!-- 空状态（已有或待创建的会话，但还没消息） -->
         <div
-          v-else-if="!store.messages.length && store.activeSessionId"
+          v-else-if="!store.messages.length && (store.activeSessionId || store.pendingNew)"
           class="flex flex-col items-center justify-center h-full gap-4 text-zinc-400"
         >
           <MessageSquare class="w-12 h-12 opacity-20" />
@@ -76,7 +76,7 @@ onMounted(async () => {
 
         <!-- 无会话 -->
         <div
-          v-else-if="!store.activeSessionId"
+          v-else-if="!store.activeSessionId && !store.pendingNew"
           class="flex flex-col items-center justify-center h-full gap-4 text-zinc-400"
         >
           <MessageSquare class="w-12 h-12 opacity-20" />
@@ -95,7 +95,7 @@ onMounted(async () => {
 
       <!-- 输入框 -->
       <ChatInput
-        :disabled="!store.activeSessionId"
+        :disabled="!store.activeSessionId && !store.pendingNew"
         :is-streaming="store.isStreaming"
         @send="handleSend"
         @stop="store.stopGeneration()"
