@@ -5,25 +5,26 @@ description: ArcKnowledge 的界面是一张特藏阅览室的调阅台。桌面
 
 colors:
   # 主色即铅笔。显式声明是为了堵住一个洞：缺 primary 时 agent 会自行编一个，
-  # 多半编出个蓝色。
-  primary: '#1C1C1E'
+  # 多半编出个蓝色。整套灰是纯中性（R=G=B）：桌上唯一的色相是朱红。
+  # 曾一度漂成冷灰（zinc，蓝 +2~7），与"唯一色相是朱红"自相矛盾，已归正。
+  primary: '#1C1C1C'
 
   # 纸与桌。相邻档 >=1.08，够分辨 hover 与选中
   paper: '#FCFCFC'
-  desk: '#F1F1F3'
-  desk-hover: '#E8E8EC'
-  desk-sunken: '#DEDEE3'
+  desk: '#F1F1F1'
+  desk-hover: '#E8E8E8'
+  desk-sunken: '#DEDEDE'
 
   # 石墨。白底上可读的文字档最多三档（每档需 >=4.5:1），这是物理上限，
   # 不是取值问题。三级与二级只差 1.35:1 —— 层级由字号字重承担，明度只是辅助。
-  graphite: '#1C1C1E'      # 16.58 / 15.08（纸 / 桌板）
-  graphite-70: '#5B5B61'   #  6.57 / 5.98
-  graphite-45: '#6C6C73'   #  5.08 / 4.62 —— 已是两面都过 AA 的最浅值，不可再调浅
-  graphite-25: '#B8B8BE'   #  1.92 —— 不承载文字，只做禁用与装饰线
+  graphite: '#1C1C1C'      # 16.61 / 15.09（纸 / 桌板）
+  graphite-70: '#5B5B5B'   #  6.62 / 6.01
+  graphite-45: '#6C6C6C'   #  5.12 / 4.65 —— 已是两面都过 AA 的最浅值，不可再调浅
+  graphite-25: '#B8B8B8'   #  1.93 —— 不承载文字，只做禁用与装饰线
 
   # 格线
-  rule: '#E4E4E7'
-  rule-strong: '#D6D6DA'
+  rule: '#E4E4E4'
+  rule-strong: '#D6D6D6'
 
   # 钤印：只标"依据"。它是描线的印，永不填底
   # 6.14（纸）/ 5.14（印泥底）—— 两面都过 AA
@@ -41,7 +42,7 @@ colors:
   alert-ink: '#7A2A20'
 
   # 焦点环：石墨。>=3:1 且不消耗任何色相
-  focus: '#1C1C1E'
+  focus: '#1C1C1C'
 
 typography:
   display:
@@ -112,10 +113,10 @@ spacing:
 elevation:
   flat: 'none'
   # 零偏移的软落影 = 贴着。四条边都有，没有硬边
-  contact: '0 1px 2px rgba(28,28,30,0.04), 0 0 24px rgba(28,28,30,0.06)'
+  contact: '0 1px 2px rgba(28,28,28,0.04), 0 0 24px rgba(28,28,28,0.06)'
   # 笔下那张单子：压在别的纸上面，微微高出一点。偏移封顶 2px —— 它是压着，不是飘着
-  slip: '0 2px 6px rgba(28,28,30,0.06), 0 0 20px rgba(28,28,30,0.05)'
-  overlay: '0 4px 16px rgba(28,28,30,0.08)'
+  slip: '0 2px 6px rgba(28,28,28,0.06), 0 0 20px rgba(28,28,28,0.05)'
+  overlay: '0 4px 16px rgba(28,28,28,0.08)'
 
 measure:
   prose: 640px
@@ -543,7 +544,7 @@ components:
     rounded: '{rounded.lg}'
     padding: 20px
   dialog-scrim:
-    backgroundColor: '#1C1C1E26'
+    backgroundColor: '#1C1C1C26'
   toast:
     backgroundColor: '{colors.graphite}'
     textColor: '{colors.paper}'
@@ -646,7 +647,7 @@ ArcKnowledge 的界面是**一间特藏阅览室的调阅台**。
 
   所以 {elevation.contact} 里那个 24px 模糊是**对的**：一片零偏移的软影，在纸的边缘最暗，向桌板上散开约 10px。**别把它换成 1px 的硬环**——那条线是刀切出来的，纸的边不是那样。
 
-- **影是石墨色的**（`rgba(28,28,30,…)`），不是纯黑——同 {colors.graphite} 的理由：纯黑是印刷油墨，不是铅笔。
+- **影是石墨色的**（`rgba(28,28,28,…)`），不是纯黑——同 {colors.graphite} 的理由：纯黑是印刷油墨，不是铅笔。
 - **同一个 {elevation.contact} 在两种底色上自动做对的事。** 实测（4x 截图逐像素）：压在桌板上时从平地 240 渐暗到边缘 **230**，落影宽 **10px**，与 {colors.rule}（228）同重——纸的边看得见，且没有硬线；压在纸上时只到 ~239，几乎无形，于是卡片的边仍由 {colors.rule} 承担。**一个 token，不用开两个。**
 - **卡片压在纸上仍需 {colors.rule}**——同色叠同色，光靠接触影分不开。纸与桌板之间则不画边框：影已经是那条边了，再加就是双线。
 - **别用阴影做强调。** 一张卡不会因为重要就浮起来。要强调，用位置、留白、{components.seal-mark}。
