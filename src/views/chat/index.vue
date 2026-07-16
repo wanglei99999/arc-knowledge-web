@@ -1,105 +1,109 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
-import SessionList from '@/components/chat/SessionList.vue'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
-import { MessageSquare } from 'lucide-vue-next'
+import { Compass, Combine, Quote, SearchX } from 'lucide-vue-next'
 
 const store = useChatStore()
 const messagesEl = ref<HTMLElement | null>(null)
+const inputEl = ref<InstanceType<typeof ChatInput> | null>(null)
+
+/**
+ * 四个动作要在一眼之内被区分——这正是"用户此刻在判断它"的定义，
+ * 也是类型色在全屏唯一一次出场的理由。
+ */
+const intents = [
+  { icon: Compass, tone: 'text-accent-blue',   label: '探索', question: '这个空间里有哪些文档？' },
+  { icon: Combine, tone: 'text-accent-violet', label: '综述', question: '把这些文档的要点综述成一段。' },
+  { icon: Quote,   tone: 'text-accent-green',  label: '求证', question: '这个说法的依据是什么？' },
+  { icon: SearchX, tone: 'text-accent-amber',  label: '排查', question: '为什么这个问题召不回相关内容？' },
+] as const
 
 function scrollToBottom(smooth = true) {
   nextTick(() => {
-    if (messagesEl.value) {
-      messagesEl.value.scrollTo({
-        top: messagesEl.value.scrollHeight,
-        behavior: smooth ? 'smooth' : 'instant',
-      })
-    }
+    messagesEl.value?.scrollTo({
+      top: messagesEl.value.scrollHeight,
+      behavior: smooth ? 'smooth' : 'instant',
+    })
   })
 }
 
-// 新消息时自动滚动到底部
 watch(() => store.messages.length, () => scrollToBottom())
-// 流式输出时持续滚动
 watch(
   () => store.messages[store.messages.length - 1]?.content,
   () => { if (store.isStreaming) scrollToBottom(false) },
 )
 
+/** 空桌子是一张邀请函：没有会话不该拦着人提问，直接开一张单子就是了 */
+function ensureSession() {
+  if (!store.activeSessionId && !store.pendingNew) store.newSession()
+}
+
 function handleSend(content: string) {
+  ensureSession()
   store.sendMessage(content)
 }
 
-onMounted(async () => {
-  await store.fetchSessions()
-  scrollToBottom(false)
-})
+function pickIntent(question: string) {
+  ensureSession()
+  nextTick(() => inputEl.value?.fill(question))
+}
+
+onMounted(() => scrollToBottom(false))
 </script>
 
 <template>
   <!-- 负边距抵消 AppLayout main 的 p-6，充满整个内容区 -->
-  <div class="flex -m-6 overflow-hidden" style="height: calc(100vh - 60px)">
+  <div class="-m-6 flex flex-col overflow-hidden bg-paper" style="height: calc(100vh - 60px)">
+    <div ref="messagesEl" class="flex-1 overflow-y-auto px-xl py-xl">
 
-    <!-- 左侧：会话列表 -->
-    <aside class="w-60 shrink-0 flex flex-col border-r border-surface-border bg-surface-card overflow-hidden">
-      <div class="px-4 py-3 border-b border-surface-border shrink-0">
-        <h2 class="text-sm font-semibold text-zinc-700">智能问答</h2>
+      <div v-if="store.messagesLoading" class="mx-auto max-w-prose space-y-md" aria-hidden="true">
+        <div
+          v-for="i in 4"
+          :key="i"
+          class="h-3 animate-breathe rounded-xs bg-desk-hover"
+          :style="{ width: `${[94, 88, 96, 61][i - 1]}%` }"
+        />
       </div>
-      <div class="flex-1 overflow-hidden">
-        <SessionList />
-      </div>
-    </aside>
 
-    <!-- 右侧：消息区 + 输入框 -->
-    <div class="flex-1 flex flex-col overflow-hidden bg-surface">
-
-      <!-- 消息列表 -->
+      <!-- 空桌子是一张邀请函 -->
       <div
-        ref="messagesEl"
-        class="flex-1 overflow-y-auto px-6 py-6 space-y-5"
+        v-else-if="!store.messages.length"
+        class="mx-auto flex h-full max-w-prose flex-col justify-center"
       >
-        <!-- 加载中 -->
-        <div v-if="store.messagesLoading" class="flex justify-center py-16">
-          <a-spin />
-        </div>
+        <h1 class="text-display text-balance text-graphite-45">今天要查什么？</h1>
 
-        <!-- 空状态（已有或待创建的会话，但还没消息） -->
-        <div
-          v-else-if="!store.messages.length && (store.activeSessionId || store.pendingNew)"
-          class="flex flex-col items-center justify-center h-full gap-4 text-zinc-400"
-        >
-          <MessageSquare class="w-12 h-12 opacity-20" />
-          <p class="text-sm">开始提问，AI 将基于知识库为您解答</p>
+        <div class="mt-xl grid gap-sm sm:grid-cols-2">
+          <button
+            v-for="intent in intents"
+            :key="intent.label"
+            type="button"
+            class="rounded-lg border border-rule bg-paper p-[14px] text-left transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
+            @click="pickIntent(intent.question)"
+          >
+            <component :is="intent.icon" :class="['h-[18px] w-[18px]', intent.tone]" :stroke-width="1.5" />
+            <p class="mt-sm text-label text-graphite">{{ intent.label }}</p>
+            <p class="mt-xxs text-meta text-graphite-45">{{ intent.question }}</p>
+          </button>
         </div>
-
-        <!-- 无会话 -->
-        <div
-          v-else-if="!store.activeSessionId && !store.pendingNew"
-          class="flex flex-col items-center justify-center h-full gap-4 text-zinc-400"
-        >
-          <MessageSquare class="w-12 h-12 opacity-20" />
-          <p class="text-sm">点击左侧「新建会话」开始</p>
-        </div>
-
-        <!-- 消息列表 -->
-        <template v-else>
-          <MessageBubble
-            v-for="msg in store.messages"
-            :key="msg.id"
-            :message="msg"
-          />
-        </template>
       </div>
 
-      <!-- 输入框 -->
-      <ChatInput
-        :disabled="!store.activeSessionId && !store.pendingNew"
-        :is-streaming="store.isStreaming"
-        @send="handleSend"
-        @stop="store.stopGeneration()"
-      />
+      <div v-else class="mx-auto max-w-prose space-y-xl">
+        <MessageBubble
+          v-for="msg in store.messages"
+          :key="msg.id"
+          :message="msg"
+        />
+      </div>
     </div>
+
+    <ChatInput
+      ref="inputEl"
+      :disabled="false"
+      :is-streaming="store.isStreaming"
+      @send="handleSend"
+      @stop="store.stopGeneration()"
+    />
   </div>
 </template>

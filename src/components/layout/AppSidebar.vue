@@ -1,19 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useSpacesStore } from '@/stores/spaces'
+import { useChatStore } from '@/stores/chat'
 import {
   LayoutDashboard,
   FileText,
-  MessageSquare,
   Search,
   Settings,
-  ChevronLeft,
-  ChevronRight,
-  Database,
-  Layers,
-  ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Library,
+  SquarePen,
+  Folder,
+  FolderOpen,
   Plus,
   Trash2,
 } from 'lucide-vue-next'
@@ -21,32 +22,41 @@ import { Modal, message } from 'ant-design-vue'
 import { cn } from '@/lib/utils'
 
 const route = useRoute()
+const router = useRouter()
 const appStore = useAppStore()
 const spacesStore = useSpacesStore()
+const chatStore = useChatStore()
 
+/** 功能菜单。智能问答不在这里——「新建会话」和底下的会话行就是它的入口 */
 const navItems = [
   { path: '/',          icon: LayoutDashboard, label: '概览'     },
-  { path: '/documents', icon: FileText,         label: '文档管理' },
-  { path: '/chat',      icon: MessageSquare,    label: '智能问答' },
-  { path: '/search',    icon: Search,           label: '检索调试' },
-  { path: '/admin',     icon: Settings,         label: '管理配置' },
-]
+  { path: '/documents', icon: FileText,        label: '文档管理' },
+  { path: '/search',    icon: Search,          label: '检索调试' },
+] as const
 
 const isActive = (path: string) =>
   path === '/' ? route.path === '/' : route.path.startsWith(path)
 
-//空间切换器
-const dropdownOpen = ref(false)
-const newSpaceName = ref('')
 const creating = ref(false)
-function toggleDropdown(){
-  dropdownOpen.value = !dropdownOpen.value
-  newSpaceName.value = ''
+const newSpaceName = ref('')
+const composingSpace = ref(false)
+
+async function startChat() {
+  chatStore.newSession()
+  if (!route.path.startsWith('/chat')) await router.push('/chat')
 }
 
-function selectSpace(id: string){
-  spacesStore.switchSpace(id)
-  dropdownOpen.value = false
+async function openSession(id: string) {
+  chatStore.switchSession(id)
+  if (!route.path.startsWith('/chat')) await router.push('/chat')
+}
+
+/**
+ * 只有当前空间展开。这不是偷懒：store 里只存着当前空间的会话，
+ * 给别的空间画一份会话列表就是在编。点它 = 切过去 = 它成为当前空间 = 会话自然加载。
+ */
+function toggleSpace(id: string) {
+  if (spacesStore.currentSpace?.space_id !== id) spacesStore.switchSpace(id)
 }
 
 function confirmDeleteSpace(e: Event, spaceId: string, spaceName: string) {
@@ -54,7 +64,7 @@ function confirmDeleteSpace(e: Event, spaceId: string, spaceName: string) {
   Modal.confirm({
     title: '删除空间',
     content: `确认删除「${spaceName}」？空间内的文档数据不会被删除。`,
-    okText: '确认删除',
+    okText: '删除空间',
     okType: 'danger',
     cancelText: '取消',
     async onOk() {
@@ -64,142 +74,221 @@ function confirmDeleteSpace(e: Event, spaceId: string, spaceName: string) {
   })
 }
 
-async function handleCreate(){
-  const name = newSpaceName.value.trim()
-  if(!name||creating.value) return 
-  creating.value = true
-  try{
-    await spacesStore.createSpace(name)
-    dropdownOpen.value = false
-  } finally{
-    creating.value = false
-    newSpaceName.value = ''
-  }
+function confirmDeleteSession(e: Event, id: string, title: string) {
+  e.stopPropagation()
+  Modal.confirm({
+    title: '删除会话',
+    content: `删除「${title}」后不可恢复。`,
+    okText: '删除会话',
+    okType: 'danger',
+    cancelText: '取消',
+    async onOk() {
+      await chatStore.removeSession(id)
+    },
+  })
 }
 
+async function handleCreateSpace() {
+  const name = newSpaceName.value.trim()
+  if (!name || creating.value) return
+  creating.value = true
+  try {
+    await spacesStore.createSpace(name)
+    composingSpace.value = false
+    newSpaceName.value = ''
+  } finally {
+    creating.value = false
+  }
+}
 </script>
 
 <template>
+  <!-- 桌板本身。没有右边框——靠底色差一格与主区分开，不靠线 -->
   <aside
     :class="cn(
-      'flex flex-col bg-sidebar-bg border-r border-sidebar-border transition-all duration-300 shrink-0',
-      appStore.sidebarCollapsed ? 'w-[60px]' : 'w-[240px]'
+      'flex shrink-0 flex-col bg-desk transition-[width] duration-standard ease-settle motion-reduce:transition-none',
+      appStore.sidebarCollapsed ? 'w-[60px]' : 'w-[260px]',
     )"
   >
-    <!-- Logo -->
-    <div class="flex items-center gap-3 px-4 h-[60px] border-b border-sidebar-border shrink-0">
-      <div class="flex items-center justify-center w-8 h-8 rounded-lg bg-primary shrink-0">
-        <Database class="w-4 h-4 text-white" />
-      </div>
-      <span
-        v-if="!appStore.sidebarCollapsed"
-        class="text-white font-semibold text-sm tracking-wide truncate"
-      >
+    <div class="flex h-[60px] shrink-0 items-center gap-sm px-md">
+      <Library class="h-4 w-4 shrink-0 text-graphite" :stroke-width="1.5" />
+      <span v-if="!appStore.sidebarCollapsed" class="truncate text-title text-graphite">
         ArcKnowledge
       </span>
     </div>
 
-    <!-- 空间切换器 -->
-    <div class="relative px-2 py-2 border-b border-sidebar-border shrink-0">
+    <!-- 功能菜单 -->
+    <nav class="shrink-0 px-sm">
       <button
+        type="button"
         :class="cn(
-          'flex items-center w-full rounded-lg px-3 py-2 text-sidebar-text hover:bg-sidebar-hover hover:text-white transition-colors',
-          appStore.sidebarCollapsed ? 'justify-center' : 'gap-2'
+          'flex h-8 w-full items-center rounded-sm px-sm text-label text-graphite-70',
+          'transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none',
+          appStore.sidebarCollapsed ? 'justify-center' : 'gap-sm',
         )"
-        @click="toggleDropdown"
+        @click="startChat"
       >
-        <Layers class="w-4 h-4 shrink-0" />
-        <span v-if="!appStore.sidebarCollapsed" class="flex-1 text-left text-sm truncate">
-          {{ spacesStore.currentSpace?.name ?? '选择空间' }}
-        </span>
-        <ChevronDown v-if="!appStore.sidebarCollapsed" class="w-3 h-3 shrink-0" />
+        <SquarePen class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+        <span v-if="!appStore.sidebarCollapsed" class="truncate">新建会话</span>
       </button>
 
-      <!-- 下拉菜单 -->
-      <template v-if="dropdownOpen">
-        <!-- 遮罩 -->
-        <div class="fixed inset-0 z-10" @click="dropdownOpen = false" />
-        <!-- 菜单内容 -->
-        <div class="absolute left-2 right-2 top-full mt-1 z-20 bg-gray-800 border border-gray-600 rounded-lg shadow-xl overflow-hidden">
-          <div
-            v-for="s in spacesStore.spaces"
-            :key="s.space_id"
-            :class="cn(
-              'group flex items-center gap-2 px-3 py-2 text-sm cursor-pointer transition-colors',
-              s.space_id === spacesStore.currentSpace?.space_id
-                ? 'bg-primary text-white'
-                : 'text-gray-300 hover:bg-gray-700'
-            )"
-            @click="selectSpace(s.space_id)"
-          >
-            <span class="flex-1 truncate">{{ s.name }}</span>
-            <button
-              class="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded hover:text-red-400"
-              @click="confirmDeleteSpace($event, s.space_id, s.name)"
-            >
-              <Trash2 class="w-3 h-3" />
-            </button>
-          </div>
-
-          <div class="border-t border-gray-600 p-2">
-            <div class="flex gap-1">
-              <input
-                v-model="newSpaceName"
-                class="flex-1 bg-gray-700 text-white text-sm rounded px-2 py-1 outline-none placeholder-gray-400"
-                placeholder="新建空间..."
-                @keyup.enter="handleCreate"
-              />
-              <button
-                class="flex items-center justify-center w-7 h-7 rounded bg-primary hover:bg-primary/80 text-white transition-colors disabled:opacity-50"
-                :disabled="!newSpaceName.trim() || creating"
-                @click="handleCreate"
-              >
-                <Plus class="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </template>
-    </div>
-
-    <!-- 导航项 -->
-    <nav class="flex-1 px-2 py-4 space-y-1 overflow-y-auto">
       <RouterLink
         v-for="item in navItems"
         :key="item.path"
         :to="item.path"
         :class="cn(
-          'flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-150 group',
+          'flex h-8 items-center rounded-sm px-sm text-label',
+          'transition-colors duration-hover ease-settle motion-reduce:transition-none',
+          appStore.sidebarCollapsed ? 'justify-center' : 'gap-sm',
           isActive(item.path)
-            ? 'bg-sidebar-active text-white'
-            : 'text-sidebar-text hover:bg-sidebar-hover hover:text-white'
+            ? 'bg-desk-sunken text-graphite'
+            : 'text-graphite-70 hover:bg-desk-hover hover:text-graphite',
         )"
       >
-        <component
-          :is="item.icon"
-          :class="cn(
-            'shrink-0 transition-colors',
-            appStore.sidebarCollapsed ? 'w-5 h-5' : 'w-4 h-4',
-            isActive(item.path) ? 'text-primary-300' : 'text-sidebar-text group-hover:text-white'
-          )"
-        />
-        <span
-          v-if="!appStore.sidebarCollapsed"
-          class="text-sm font-medium truncate"
-        >
-          {{ item.label }}
-        </span>
+        <component :is="item.icon" class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+        <span v-if="!appStore.sidebarCollapsed" class="truncate">{{ item.label }}</span>
       </RouterLink>
     </nav>
 
-    <!-- 折叠按钮 -->
-    <div class="px-2 pb-4 shrink-0">
+    <!-- 知识库：空间是库房，会话挂在库房底下 -->
+    <div v-if="!appStore.sidebarCollapsed" class="flex min-h-0 flex-1 flex-col pt-xl">
+      <div class="flex shrink-0 items-center gap-xs px-md pb-xs">
+        <span class="flex-1 text-meta text-graphite-45">知识库</span>
+        <button
+          type="button"
+          aria-label="新建空间"
+          class="grid h-5 w-5 place-items-center rounded-xs text-graphite-45 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
+          @click="composingSpace = !composingSpace"
+        >
+          <Plus class="h-3.5 w-3.5" :stroke-width="1.5" />
+        </button>
+      </div>
+
+      <div v-if="composingSpace" class="shrink-0 px-sm pb-xs">
+        <input
+          v-model="newSpaceName"
+          placeholder="空间名，Enter 建立"
+          autofocus
+          class="h-8 w-full rounded-md border border-rule-strong bg-paper px-[10px] text-body-sm text-graphite outline-none transition-colors duration-hover ease-settle placeholder:text-graphite-45 focus:border-graphite motion-reduce:transition-none"
+          @keyup.enter="handleCreateSpace"
+          @keyup.esc="composingSpace = false"
+        />
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto px-sm pb-md">
+        <template v-for="space in spacesStore.spaces" :key="space.space_id">
+          <div
+            :class="cn(
+              'group flex h-8 cursor-pointer items-center gap-sm rounded-sm px-sm text-label',
+              'transition-colors duration-hover ease-settle motion-reduce:transition-none',
+              spacesStore.currentSpace?.space_id === space.space_id
+                ? 'text-graphite'
+                : 'text-graphite-70 hover:bg-desk-hover hover:text-graphite',
+            )"
+            @click="toggleSpace(space.space_id)"
+          >
+            <FolderOpen
+              v-if="spacesStore.currentSpace?.space_id === space.space_id"
+              class="h-4 w-4 shrink-0"
+              :stroke-width="1.5"
+            />
+            <Folder v-else class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+            <span class="min-w-0 flex-1 truncate">{{ space.name }}</span>
+            <button
+              type="button"
+              :aria-label="`删除空间 ${space.name}`"
+              class="hidden shrink-0 rounded-xs p-[2px] text-graphite-45 hover:text-alert-ink group-hover:block"
+              @click="confirmDeleteSpace($event, space.space_id, space.name)"
+            >
+              <Trash2 class="h-3 w-3" :stroke-width="1.5" />
+            </button>
+          </div>
+
+          <!-- 只有当前空间摊开它的会话 -->
+          <div v-if="spacesStore.currentSpace?.space_id === space.space_id" class="pl-lg">
+            <div v-if="chatStore.sessionsLoading" class="space-y-xs py-xs pl-sm" aria-hidden="true">
+              <div
+                v-for="i in 3"
+                :key="i"
+                class="h-3 animate-breathe rounded-xs bg-desk-hover"
+                :style="{ width: `${[78, 60, 68][i - 1]}%` }"
+              />
+            </div>
+
+            <template v-else>
+              <div
+                v-if="chatStore.pendingNew"
+                class="flex items-center gap-sm rounded-sm bg-desk-sunken px-sm py-[5px] text-meta text-graphite"
+              >
+                <span class="min-w-0 flex-1 truncate">新会话</span>
+                <span class="shrink-0 font-callnum text-callnum-sm text-graphite-45">待发送</span>
+              </div>
+
+              <div
+                v-for="session in chatStore.sessions"
+                :key="session.id"
+                :class="cn(
+                  'group flex cursor-pointer items-center gap-sm rounded-sm px-sm py-[5px] text-meta',
+                  'transition-colors duration-hover ease-settle motion-reduce:transition-none',
+                  chatStore.activeSessionId === session.id && route.path.startsWith('/chat')
+                    ? 'bg-desk-sunken text-graphite'
+                    : 'text-graphite-45 hover:bg-desk-hover hover:text-graphite',
+                )"
+                @click="openSession(session.id)"
+              >
+                <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
+                <button
+                  type="button"
+                  :aria-label="`删除会话 ${session.title}`"
+                  class="hidden shrink-0 rounded-xs p-[2px] text-graphite-45 hover:text-alert-ink group-hover:block"
+                  @click="confirmDeleteSession($event, session.id, session.title)"
+                >
+                  <Trash2 class="h-3 w-3" :stroke-width="1.5" />
+                </button>
+              </div>
+
+              <p
+                v-if="!chatStore.sessions.length && !chatStore.pendingNew"
+                class="px-sm py-xs text-meta text-graphite-45"
+              >
+                无会话
+              </p>
+            </template>
+          </div>
+        </template>
+
+        <p v-if="!spacesStore.spaces.length" class="px-sm py-xs text-meta text-graphite-45">
+          还没有空间。用上面的 + 建一个。
+        </p>
+      </div>
+    </div>
+
+    <div v-else class="flex-1" />
+
+    <div class="shrink-0 border-t border-rule p-sm">
+      <RouterLink
+        to="/admin"
+        :class="cn(
+          'flex h-8 items-center rounded-sm px-sm text-label',
+          'transition-colors duration-hover ease-settle motion-reduce:transition-none',
+          appStore.sidebarCollapsed ? 'justify-center' : 'gap-sm',
+          isActive('/admin')
+            ? 'bg-desk-sunken text-graphite'
+            : 'text-graphite-70 hover:bg-desk-hover hover:text-graphite',
+        )"
+      >
+        <Settings class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+        <span v-if="!appStore.sidebarCollapsed" class="truncate">设置</span>
+      </RouterLink>
+
       <button
-        class="flex items-center justify-center w-full h-9 rounded-lg text-sidebar-text hover:bg-sidebar-hover hover:text-white transition-colors"
+        type="button"
+        :aria-label="appStore.sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
+        class="mt-xs flex h-8 w-full items-center justify-center rounded-sm text-graphite-45 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
         @click="appStore.toggleSidebar"
       >
-        <ChevronLeft v-if="!appStore.sidebarCollapsed" class="w-4 h-4" />
-        <ChevronRight v-else class="w-4 h-4" />
+        <PanelLeftClose v-if="!appStore.sidebarCollapsed" class="h-4 w-4" :stroke-width="1.5" />
+        <PanelLeftOpen v-else class="h-4 w-4" :stroke-width="1.5" />
       </button>
     </div>
   </aside>
