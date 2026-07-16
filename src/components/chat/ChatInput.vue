@@ -122,7 +122,7 @@ defineExpose({ fill })
       <!-- 输入的那张卡。聚焦时上浮 3px，边框从 rule-strong 收紧到 graphite-25 -->
       <div
         :class="cn(
-          'relative rounded-lg border bg-paper p-md',
+          'relative rounded-lg border bg-paper p-md shadow-slip',
           'transition-[transform,border-color] duration-standard ease-settle',
           'motion-reduce:transition-none motion-reduce:transform-none',
           // 焦点环走 focus-ring token：2px 石墨、2px 外偏移。

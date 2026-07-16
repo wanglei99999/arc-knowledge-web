@@ -128,9 +128,14 @@ export default {
         xxl: '32px',
       },
 
-      // elevation —— 手写。纸平放在桌上，只有浮层离开桌面
+      // elevation —— 手写。纸不浮，但纸有厚度：影表示厚度，不表示重要性。
+      // 影是石墨色的，不是纯黑——同 graphite 的理由
       boxShadow: {
-        overlay: '0 4px 16px rgba(0,0,0,0.08)',
+        // 接触影在四条边都有，不只在底下——1px 的环就是那条接触线。
+        // 纯向下的影在纸的左边缘什么也画不出，而那正是纸与桌板相遇的地方
+        contact: '0 0 0 1px rgba(28,28,30,0.05), 0 1px 2px rgba(28,28,30,0.05)',
+        slip: '0 2px 4px rgba(28,28,30,0.04), 0 8px 24px rgba(28,28,30,0.06)',
+        overlay: '0 4px 16px rgba(28,28,30,0.08)',
         // 旧系统，待迁移
         card: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
         'card-hover': '0 4px 12px rgba(0,0,0,0.10)',

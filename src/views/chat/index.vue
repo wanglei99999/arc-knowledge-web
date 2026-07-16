@@ -54,8 +54,8 @@ onMounted(() => scrollToBottom(false))
 </script>
 
 <template>
-  <!-- 负边距抵消 AppLayout main 的 p-6，充满整个内容区 -->
-  <div class="-m-6 flex flex-col overflow-hidden bg-paper" style="height: calc(100vh - 60px)">
+  <!-- 满幅：输入器要贴着纸的底边 -->
+  <div class="flex h-full flex-col overflow-hidden">
     <div ref="messagesEl" class="flex-1 overflow-y-auto px-xl py-xl">
 
       <div v-if="store.messagesLoading" class="mx-auto max-w-prose space-y-md" aria-hidden="true">
@@ -79,7 +79,7 @@ onMounted(() => scrollToBottom(false))
             v-for="intent in intents"
             :key="intent.label"
             type="button"
-            class="rounded-lg border border-rule bg-paper p-[14px] text-left transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
+            class="rounded-lg border border-rule bg-paper p-[14px] text-left shadow-contact transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
             @click="pickIntent(intent.question)"
           >
             <component :is="intent.icon" :class="['h-[18px] w-[18px]', intent.tone]" :stroke-width="1.5" />

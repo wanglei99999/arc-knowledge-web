@@ -29,7 +29,8 @@ async function handleLogout() {
 </script>
 
 <template>
-  <header class="flex h-[60px] shrink-0 items-center justify-between border-b border-rule bg-paper px-xl">
+  <!-- 不写底色：它就在那张纸上，不是另一层 -->
+  <header class="flex h-[60px] shrink-0 items-center justify-between border-b border-rule px-xl">
     <!-- 收起侧栏。贴着侧栏的边——它调的是侧栏与主区的关系，
          手要够的是那条边，不是屏幕对角 -->
     <div class="flex items-center gap-sm">
