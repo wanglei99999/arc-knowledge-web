@@ -2,6 +2,7 @@
 import { ref, computed, nextTick } from 'vue'
 import { ArrowUp, Square, Plus, X, Paperclip, Library, Check } from 'lucide-vue-next'
 import { useSpacesStore } from '@/stores/spaces'
+import { useChatStore } from '@/stores/chat'
 import { uploadDocument } from '@/api/document'
 import { ACCEPTED_MIME, ACCEPTED_LABEL, isAccepted } from '@/lib/file-types'
 import { cn } from '@/lib/utils'
@@ -17,6 +18,7 @@ const emit = defineEmits<{
 }>()
 
 const spacesStore = useSpacesStore()
+const chatStore = useChatStore()
 const text = ref('')
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const fileEl = ref<HTMLInputElement | null>(null)
@@ -25,6 +27,13 @@ const fileEl = ref<HTMLInputElement | null>(null)
 const menu = ref<'add' | 'space' | null>(null)
 
 const space = computed(() => spacesStore.currentSpace)
+
+/**
+ * 空间是会话的属性，在建立那一刻定下来。所以抬头只在新建对话时出现：
+ * 打开一条历史会话时它已经属于某个空间了（侧栏里就嵌在那个空间底下），
+ * 再显示一遍是把一次性的选择变成永久的装饰。
+ */
+const isNewConversation = computed(() => !chatStore.activeSessionId)
 
 /**
  * /chat 的 space_id 是必填（app/api/routers/chat.py）。没有空间就发不出去，
@@ -165,10 +174,10 @@ defineExpose({ fill })
         </div>
       </Transition>
 
-      <!-- 空间选择器 -->
+      <!-- 空间选择器：只有新建对话才需要挑库房 -->
       <Transition name="overlay">
         <div
-          v-if="menu === 'space'"
+          v-if="menu === 'space' && isNewConversation"
           class="absolute bottom-full left-0 z-40 mb-sm w-64 rounded-lg border border-rule-strong bg-paper p-xs shadow-overlay"
         >
           <p class="px-sm py-xs text-meta text-graphite-45">工作空间</p>
@@ -192,10 +201,13 @@ defineExpose({ fill })
         </div>
       </Transition>
 
-      <!-- 调阅单抬头：压在后面的那张卡，只露出上边缘。
+      <!-- 调阅单抬头：压在后面的那张卡，只露出上边缘。只在新建对话时出现。
            不描边——它靠底色就认得出来，轮廓只会在接缝上多画一条线。
            圆角与下面那张卡一致，否则接缝是歪的 -->
-      <div class="mx-md flex items-center gap-sm rounded-t-xl bg-desk px-md pt-xs pb-md -mb-sm">
+      <div
+        v-if="isNewConversation"
+        class="mx-md flex items-center gap-sm rounded-t-xl bg-desk px-md pt-xs pb-md -mb-sm"
+      >
         <!-- 叉：选中了才有得叉 -->
         <button
           v-if="space"
