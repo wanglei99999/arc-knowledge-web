@@ -7,7 +7,6 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "preview": "vite preview",
-    "lint": "eslint src --ext .vue,.ts,.tsx --fix",
     "format": "prettier --write src/**/*.{vue,ts,tsx}",
     "shot": "node scripts/shot.mjs"
   },
@@ -30,11 +29,9 @@
     "vue-router": "^4.3.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
     "@vitejs/plugin-vue": "^5.0.0",
     "@vitejs/plugin-vue-jsx": "^4.0.0",
     "autoprefixer": "^10.4.0",
-    "eslint": "^8.57.0",
     "playwright": "^1.61.1",
     "postcss": "^8.4.0",
     "prettier": "^3.3.0",
