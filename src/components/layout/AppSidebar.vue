@@ -181,7 +181,7 @@ async function handleCreateSpace() {
           v-model="newSpaceName"
           placeholder="空间名，Enter 建立"
           autofocus
-          class="h-8 w-full rounded-md border border-rule-strong bg-paper px-[10px] text-body-sm text-graphite outline-none transition-colors duration-hover ease-settle placeholder:text-graphite-45 focus:border-graphite motion-reduce:transition-none"
+          class="h-8 w-full rounded-md border border-rule bg-paper px-[10px] text-body-sm text-graphite outline-none transition-colors duration-hover ease-settle placeholder:text-graphite-45 focus:border-rule-strong motion-reduce:transition-none"
           @keyup.enter="handleCreateSpace"
           @keyup.esc="composingSpace = false"
         />
