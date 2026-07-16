@@ -2,6 +2,7 @@
 import { ref } from 'vue'
 import { Upload } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
+import { ACCEPTED_MIME as ACCEPTED, isAccepted } from '@/lib/file-types'
 
 const emit = defineEmits<{
   upload: [files: File[]]
@@ -10,21 +11,9 @@ const emit = defineEmits<{
 const isDragging = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
 
-const ACCEPTED = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-  'text/markdown',
-]
-
 function onDrop(e: DragEvent) {
   isDragging.value = false
-  const files = Array.from(e.dataTransfer?.files ?? []).filter(f =>
-    ACCEPTED.includes(f.type)
-  )
+  const files = Array.from(e.dataTransfer?.files ?? []).filter(isAccepted)
   if (files.length) emit('upload', files)
 }
 
