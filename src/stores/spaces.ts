@@ -7,18 +7,32 @@ export const useSpacesStore = defineStore('spaces', () => {
     const spaces = ref<SpaceVO[]>([])
     const currentSpaceId = ref(localStorage.getItem('current_space_id') ?? '')
 
+    /**
+     * 不兜底到 spaces[0]：那样「没选空间」就永远表达不出来，叉掉也会立刻弹回第一个。
+     * 首次进来的自动选择放在 fetchSpaces 里做一次，之后由用户说了算。
+     */
     const currentSpace = computed<SpaceVO | null>(() =>
-        spaces.value.find(s => s.space_id === currentSpaceId.value)
-        ?? spaces.value[0] ?? null
+        spaces.value.find(s => s.space_id === currentSpaceId.value) ?? null
     )
 
     async function fetchSpaces() {
         spaces.value = await listSpaces()
+        // 只在从没选过时替用户选一次。这里必须比对 null 而不是假值：
+        // 叉掉之后存的是 ''，那是「主动清空」，重进不该又替他选回来
+        if (localStorage.getItem('current_space_id') === null && spaces.value.length) {
+            switchSpace(spaces.value[0].space_id)
+        }
     }
 
     function switchSpace(id: string) {
         currentSpaceId.value = id
         localStorage.setItem('current_space_id', id)
+    }
+
+    /** 叉掉当前空间。/chat 的 space_id 是必填，所以清空之后发送必须挡住 */
+    function clearSpace() {
+        currentSpaceId.value = ''
+        localStorage.setItem('current_space_id', '')
     }
 
     async function createSpace(name: string) {
@@ -36,5 +50,5 @@ export const useSpacesStore = defineStore('spaces', () => {
         }
     }
 
-    return { spaces, currentSpace, fetchSpaces, switchSpace, createSpace, deleteSpace }
+    return { spaces, currentSpace, fetchSpaces, switchSpace, clearSpace, createSpace, deleteSpace }
 })
