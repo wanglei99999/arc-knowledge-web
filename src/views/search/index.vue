@@ -149,10 +149,10 @@ function switchView(v: View) {
 <template>
   <div class="mx-auto max-w-[1100px] space-y-xl p-xl">
 
-    <!-- 视图切换。两种视图是两个问题：「召回了什么」与「管线怎么走的」 -->
+    <!-- 视图切换。两种视图是两个问题：「召回了什么」与「流程怎么走的」 -->
     <div class="flex gap-xxs">
       <button
-        v-for="v in ([['results', '结果'], ['pipeline', '管线']] as [View, string][])"
+        v-for="v in ([['results', '结果'], ['pipeline', '流程']] as [View, string][])"
         :key="v[0]"
         type="button"
         :class="cn(
@@ -216,7 +216,7 @@ function switchView(v: View) {
       <p v-if="view === 'results'" class="text-meta text-graphite-45">{{ modeHint[mode] }}</p>
     </div>
 
-    <!-- 管线参数 -->
+    <!-- 流程参数 -->
     <div v-if="view === 'pipeline'" class="space-y-sm">
       <button
         type="button"
@@ -286,7 +286,7 @@ function switchView(v: View) {
       </p>
 
       <p v-else-if="!results.length" class="py-xxl text-body-sm text-graphite-45">
-        没有召回到切片。换个说法，或到「管线」看看是哪一级空了。
+        没有召回到切片。换个说法，或到「流程」看看是哪一级空了。
       </p>
 
       <template v-else>
@@ -326,7 +326,7 @@ function switchView(v: View) {
       </template>
     </template>
 
-    <!-- ── 管线视图 ─────────────────────────────────────────────── -->
+    <!-- ── 流程视图 ─────────────────────────────────────────────── -->
     <template v-else-if="debugResult">
       <!-- 查询改写 -->
       <section class="space-y-sm">
@@ -369,7 +369,7 @@ function switchView(v: View) {
         </div>
       </section>
 
-      <!-- 两路召回：它们是管线的输入 -->
+      <!-- 两路召回：它们是流程的输入 -->
       <section class="space-y-sm">
         <h2 class="text-title text-graphite">两路召回</h2>
         <p class="text-meta text-graphite-45">
