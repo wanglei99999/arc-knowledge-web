@@ -30,22 +30,23 @@ async function handleLogout() {
 
 <template>
   <header class="flex h-[60px] shrink-0 items-center justify-between border-b border-rule bg-paper px-xl">
-    <h1 class="text-title text-graphite">{{ currentTitle }}</h1>
-
-    <div class="flex items-center gap-xs">
-      <!-- 收起侧栏。放在这里而不是侧栏底部：它调的是侧栏与主区的关系，
-           不是侧栏内部的一项，站在两者交界的顶栏上才说得通 -->
+    <!-- 收起侧栏。贴着侧栏的边——它调的是侧栏与主区的关系，
+         手要够的是那条边，不是屏幕对角 -->
+    <div class="flex items-center gap-sm">
       <button
         type="button"
         :aria-label="appStore.sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
         :aria-pressed="appStore.sidebarCollapsed"
-        class="grid h-7 w-7 place-items-center rounded-sm text-graphite-70 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
+        class="-ml-sm grid h-7 w-7 shrink-0 place-items-center rounded-sm text-graphite-70 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
         @click="appStore.toggleSidebar"
       >
         <PanelLeftClose v-if="!appStore.sidebarCollapsed" class="h-4 w-4" :stroke-width="1.5" />
         <PanelLeftOpen v-else class="h-4 w-4" :stroke-width="1.5" />
       </button>
+      <h1 class="text-title text-graphite">{{ currentTitle }}</h1>
+    </div>
 
+    <div class="flex items-center gap-xs">
       <div class="relative">
         <button
           type="button"
