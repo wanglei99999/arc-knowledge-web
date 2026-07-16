@@ -11,9 +11,9 @@
       <!-- 品牌区 -->
       <div class="text-center mb-8">
         <div class="inline-flex items-center justify-center w-14 h-14 bg-blue-500 rounded-2xl mb-4 shadow-lg shadow-blue-500/30">
-          <span class="text-white text-2xl font-bold">A</span>
+          <span class="text-white text-2xl font-bold">I</span>
         </div>
-        <h1 class="text-2xl font-bold text-white">ArcKnowledge</h1>
+        <h1 class="text-2xl font-bold text-white">Incipit</h1>
         <p class="text-sm text-blue-200 mt-1">智能知识库检索平台</p>
       </div>
 

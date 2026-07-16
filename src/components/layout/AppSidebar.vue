@@ -9,7 +9,6 @@ import {
   FileText,
   Search,
   Settings,
-  Library,
   SquarePen,
   Folder,
   FolderOpen,
@@ -108,11 +107,26 @@ async function handleCreateSpace() {
       appStore.sidebarCollapsed ? 'w-[60px]' : 'w-[260px]',
     )"
   >
+    <!--
+      品牌行。不挂 lucide 图标：一个通用图标跟下面的导航图标同形同重同色，
+      品牌就读成了第五个菜单项——这是层级问题，不是好看不好看的问题。
+
+      「I」是起首字母。手抄本的 incipit 从一个放大的首字母（versal）开始，
+      而 IBM Plex Mono 的大写 I 自带上下横画，本来就是那个形，不用另画。
+
+      框取石墨不取朱红：藏书印本该是红的，但朱红一屏一枚、只标依据，
+      而 logo 是常驻的——染红就等于每屏都有一处不是依据的红，那条规则当场作废。
+    -->
     <div class="flex h-[60px] shrink-0 items-center gap-sm px-md">
-      <Library class="h-4 w-4 shrink-0 text-graphite" :stroke-width="1.5" />
-      <span v-if="!appStore.sidebarCollapsed" class="truncate text-title text-graphite">
-        ArcKnowledge
+      <span
+        aria-hidden="true"
+        class="grid h-5 w-5 shrink-0 place-items-center rounded-xs border border-graphite font-callnum text-callnum-sm leading-none text-graphite"
+      >I</span>
+      <span v-if="!appStore.sidebarCollapsed" class="truncate text-title-lg text-graphite">
+        Incipit
       </span>
+      <!-- 收起时字标被摘掉，只剩 aria-hidden 的印记，读屏就什么都读不到了 -->
+      <span v-else class="sr-only">Incipit</span>
     </div>
 
     <!-- 功能菜单 -->
