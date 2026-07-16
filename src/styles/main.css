@@ -77,6 +77,21 @@
   }
 }
 
+/* 空态引导卡的进退：只淡，不移。这四张卡是桌上的纸，不是浮层——
+   "桌上的纸是被放下的，不是飞进来的"（见上），所以没有 3px 上浮，
+   只随草稿有无平静地隐现。进场落定，退场直接走。
+   纯 opacity，reduced-motion 无需单独兜底（全局那条压时长就够）。 */
+.intents-enter-active {
+  transition: opacity theme('transitionDuration.standard') theme('transitionTimingFunction.settle');
+}
+.intents-leave-active {
+  transition: opacity theme('transitionDuration.standard') theme('transitionTimingFunction.exit');
+}
+.intents-enter-from,
+.intents-leave-to {
+  opacity: 0;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

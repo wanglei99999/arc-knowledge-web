@@ -19,7 +19,12 @@ const emit = defineEmits<{
 
 const spacesStore = useSpacesStore()
 const chatStore = useChatStore()
-const text = ref('')
+/**
+ * 草稿提成 model：父组件要据它决定空态引导卡是否还在
+ * ——输入框一有字，引导就该让位。text.value 的读写、fill、清空全不变，
+ * 只是这份值现在同时归父组件可见。
+ */
+const text = defineModel<string>('text', { default: '' })
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const fileEl = ref<HTMLInputElement | null>(null)
 
