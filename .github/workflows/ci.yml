@@ -1,0 +1,52 @@
+# GitHub Actions 工作流：每次 push / PR 自动跑构建，给提交打绿勾或红叉。
+# 文件放在 .github/workflows/ 下，GitHub 会自动发现并运行——不需要任何注册操作。
+
+# 显示在 GitHub「Actions」页签里的名字
+name: CI
+
+# ── 什么时候触发 ──────────────────────────────────────────────
+on:
+  push:
+    branches: [master]          # push 到 master 时跑
+  pull_request:
+    branches: [master]          # 有人开 PR 想合进 master 时也跑
+
+# ── 要做的活儿 ────────────────────────────────────────────────
+# 一个 workflow 下可以有多个 job，job 之间默认并行。这里只需要一个。
+jobs:
+  build:
+    # GitHub 免费借给我们的一次性虚拟机，用最新的 Ubuntu
+    runs-on: ubuntu-latest
+
+    # 这个前端在仓库根目录，若将来挪进子目录，改这里即可
+    defaults:
+      run:
+        working-directory: .
+
+    # 跳过 Playwright 的浏览器下载：构建用不到浏览器（那是截图/E2E 才要的），
+    # 不跳的话 npm ci 会顺带下 ~180MB，白白拖慢每次 CI
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+    # 一台机器从零开始，按顺序执行下面每一步
+    steps:
+      # 1. 把仓库代码拉到这台机器上（uses = 直接用别人写好的现成动作）
+      - name: 拉取代码
+        uses: actions/checkout@v4
+
+      # 2. 装 Node。cache: npm 会缓存依赖，第二次起 npm ci 快很多
+      - name: 装 Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      # 3. 按 package-lock.json 精确安装依赖。
+      #    npm ci 比 npm install 更适合 CI：完全照锁文件装，装前先清空，可复现
+      - name: 安装依赖
+        run: npm ci
+
+      # 4. 真正的校验：类型检查 + 打包（build 脚本是 vue-tsc && vite build）。
+      #    任何一步非零退出，这个 job 就失败，提交上显示红叉
+      - name: 构建
+        run: npm run build
