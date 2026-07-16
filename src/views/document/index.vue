@@ -20,8 +20,8 @@ async function fetchDocuments() {
   loading.value = true
   try {
     const res = await listDocuments({ space_id: spacesStore.currentSpace?.space_id ?? '', limit: 50 })
-    documents.value = (res as any).items ?? []
-    total.value     = (res as any).total ?? 0
+    documents.value = res.items
+    total.value     = res.total
   } finally {
     loading.value = false
   }
@@ -76,6 +76,13 @@ async function handleUpload(files: File[]) {
   }, 1500)
 }
 
+/**
+ * a-table 的 #bodyCell 把 record 摊成 Record<string, any>——它不认识 dataSource 的元素类型。
+ * 而 :data-source 绑的是 documents（ref<DocumentVO[]>），所以 record 运行时确实是 DocumentVO。
+ * 表格知道这件事，类型系统不知道；在这里说一次，好过在三个调用点各 as 一次。
+ */
+const asDoc = (record: Record<string, unknown>) => record as unknown as DocumentVO
+
 // ── 删除 ─────────────────────────────────────────────────────────────────────
 function confirmDelete(doc: DocumentVO) {
   Modal.confirm({
@@ -104,7 +111,7 @@ async function openChunks(doc: DocumentVO) {
   chunksLoading.value = true
   try {
     const res = await listChunks(doc.id)
-    chunks.value = (res as any).items ?? []
+    chunks.value = res.items
   } finally {
     chunksLoading.value = false
   }
@@ -189,7 +196,7 @@ function mimeLabel(mime: string) {
           <template v-if="column.key === 'original_name'">
             <button
               class="flex items-center gap-2 text-left hover:text-primary transition-colors"
-              @click="openChunks(record)"
+              @click="openChunks(asDoc(record))"
             >
               <FileText class="w-3.5 h-3.5 text-zinc-400 shrink-0" />
               <span class="text-sm font-medium text-zinc-700 truncate max-w-[280px]">
@@ -226,14 +233,14 @@ function mimeLabel(mime: string) {
             <div class="flex items-center gap-2">
               <button
                 class="text-xs text-zinc-400 hover:text-primary transition-colors"
-                @click="openChunks(record)"
+                @click="openChunks(asDoc(record))"
               >
                 切片预览
               </button>
               <span class="text-zinc-200">|</span>
               <button
                 class="text-xs text-zinc-400 hover:text-red-500 transition-colors"
-                @click="confirmDelete(record)"
+                @click="confirmDelete(asDoc(record))"
               >
                 删除
               </button>

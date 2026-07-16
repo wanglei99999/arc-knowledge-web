@@ -10,6 +10,12 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+
+    // 只跳过 .d.ts 内部的检查，不影响我们自己代码用这些类型时的检查。
+    // 需要它是因为 ant-design-vue 的 GlobalComponents 约束、markdown-it 的
+    // LinkifyIt 命名空间、md-editor-v3 三处库自身的声明就是不自洽的（153 处报错），
+    // 那是别人仓库里的 bug，我们改不了也不该等。Vue 官方 @vue/tsconfig 同样默认开启。
+    "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
