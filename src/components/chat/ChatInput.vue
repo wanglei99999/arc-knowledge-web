@@ -112,24 +112,25 @@ defineExpose({ fill })
   <div class="shrink-0 px-xl pb-lg pt-sm">
     <div class="mx-auto w-full max-w-prose">
 
-      <!-- 调阅单抬头：压在后面的那张卡，只露出上边缘。写明你要从哪个库房调东西 -->
-      <div
-        class="mx-md rounded-t-md border border-b-0 border-rule-strong bg-desk px-md pt-xxs pb-md -mb-sm"
-      >
+      <!-- 调阅单抬头：压在后面的那张卡，只露出上边缘。
+           不描边——它靠底色就认得出来，轮廓只会在接缝上多画一条线。
+           圆角与下面那张卡一致，否则接缝是歪的 -->
+      <div class="mx-md rounded-t-xl bg-desk px-md pt-xs pb-md -mb-sm">
         <span class="font-callnum text-callnum-sm text-graphite-70">空间 / {{ spaceName }}</span>
       </div>
 
       <!-- 输入的那张卡。聚焦时上浮 3px，边框从 rule-strong 收紧到 graphite-25 -->
       <div
         :class="cn(
-          'relative rounded-lg border bg-paper p-md shadow-slip',
+          'relative rounded-xl border bg-paper p-md shadow-slip',
           'transition-[transform,border-color] duration-standard ease-settle',
           'motion-reduce:transition-none motion-reduce:transform-none',
           // 焦点环走 focus-ring token：2px 石墨、2px 外偏移。
           // 边框收紧只是装饰，graphite-25 是 1.92:1，撑不起 SC 1.4.11
           'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus',
           'focus-within:-translate-y-travel focus-within:border-graphite-25',
-          'border-rule-strong',
+          // 抬起它的是 slip 的影，边只交代轮廓 —— 重边配小圆角就是塑料感
+          'border-rule',
         )"
       >
         <!-- 入库中的文档 -->
