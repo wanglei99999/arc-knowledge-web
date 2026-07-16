@@ -49,7 +49,7 @@ const ranked = computed(() =>
         v-for="({ cite, isKey }) in ranked"
         :key="`${cite.doc_id}-${cite.chunk_index}`"
         :class="cn(
-          'rounded-md border p-md',
+          'rounded-md border p-md shadow-contact',
           isKey ? 'border-seal-pale bg-seal-pale' : 'border-rule bg-paper',
         )"
       >

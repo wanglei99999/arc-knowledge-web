@@ -147,7 +147,7 @@ function switchView(v: View) {
 </script>
 
 <template>
-  <div class="mx-auto max-w-[1100px] space-y-xl">
+  <div class="mx-auto max-w-[1100px] space-y-xl p-xl">
 
     <!-- 视图切换。两种视图是两个问题：「召回了什么」与「管线怎么走的」 -->
     <div class="flex gap-xxs">
