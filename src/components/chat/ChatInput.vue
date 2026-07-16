@@ -125,13 +125,12 @@ defineExpose({ fill })
           'relative rounded-xl border bg-paper p-md shadow-slip',
           'transition-[transform,border-color] duration-standard ease-settle',
           'motion-reduce:transition-none motion-reduce:transform-none',
-          // 焦点指示就是这张单子自己的边。不套外框：focus-within 对鼠标点击
-          // 也生效，会让每次点击都在整张单子外面画一圈黑框。
-          // 只认 textarea，不用 focus-within —— 后者连点 + 号都会让整张单子
-          // 跟着亮，而 + 号已经有自己的焦点环了。
-          // 边取 graphite-70（6.57:1，SC 1.4.11 只要 3:1）而非近黑的 focus：
-          // 指示的分量该随元素尺寸反向缩放，640px 的单子配近黑边就是个黑框
-          'has-[textarea:focus]:-translate-y-travel has-[textarea:focus]:border-graphite-70',
+          // 焦点指示是光标本身：它是石墨的，16.58:1，闪在你要打字的地方。
+          // 边只是补一格（rule → rule-strong），不承担 SC 1.4.11 ——
+          // 让边去当指示器，就得顶到 3:1，而 3:1 的深边套在 640px 的单子上
+          // 就是一条黑线。有光标的用光标，没光标的（按钮、链接）才用环。
+          // 只认 textarea：focus-within 连点 + 号都会让整张单子跟着变
+          'has-[textarea:focus]:-translate-y-travel has-[textarea:focus]:border-rule-strong',
           // 抬起它的是 slip 的影，边只交代轮廓 —— 重边配小圆角就是塑料感
           'border-rule',
         )"
