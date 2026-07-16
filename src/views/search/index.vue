@@ -2,8 +2,7 @@
 import { ref, computed } from 'vue'
 import { Search, Target, Type, Combine, ArrowDownUp, ChevronRight } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
-import http from '@/utils/http'
-import { debugSearch } from '@/api/search'
+import { debugSearch, search as searchApi } from '@/api/search'
 import type { DebugResult, DebugHit } from '@/api/search'
 import { useSpacesStore } from '@/stores/spaces'
 import ScoreBar from '@/components/ui/ScoreBar.vue'
@@ -106,24 +105,25 @@ async function handleSearch() {
         ...debugParams.value,
       })
     } else {
-      const data = await http.get<{ hits: any[]; chunks: any[]; total: number }>('/search', {
-        params: {
-          q: query.value.trim(),
-          space_id: spacesStore.currentSpace?.space_id ?? '',
-          top_k: topK.value,
-          score_threshold: 0.0,
-        },
+      const data = await searchApi({
+        q: query.value.trim(),
+        space_id: spacesStore.currentSpace?.space_id ?? '',
+        top_k: topK.value,
+        score_threshold: 0.0,
       })
-      const chunkMap = new Map(data.chunks.map((c: any) => [c.chunk_id, c]))
-      results.value = data.hits.map((hit: any) => ({
+      const chunkMap = new Map(data.chunks.map(c => [c.chunk_id, c]))
+      results.value = data.hits.map(hit => ({
         chunk_id: hit.chunk_id,
         doc_id: hit.document_id,
         doc_name: hit.document_id,
         chunk_index: hit.chunk_index,
-        content: (chunkMap.get(hit.chunk_id) as any)?.content ?? '',
+        // 命中里没有原文，原文在 chunks 里，靠 chunk_id 对回去。
+        // 兜底空串不是防御性写法：真出现对不上，说明后端两个数组不同步——
+        // 那是它的 bug，前端此刻能做的只有不炸
+        content: chunkMap.get(hit.chunk_id)?.content ?? '',
         final_score: hit.score,
         source: hit.source ?? 'vector',
-      } as SearchResult))
+      }))
     }
   } finally {
     expanded.value = []
