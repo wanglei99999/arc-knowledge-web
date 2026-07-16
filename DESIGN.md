@@ -96,6 +96,7 @@ rounded:
   sm: 6px
   md: 8px
   lg: 12px
+  xl: 16px
   full: 9999px
 
 spacing:
@@ -244,25 +245,29 @@ components:
     typography: '{typography.meta}'
     rounded: '{rounded.sm}'
     padding: 5px 8px
+  # 边取 rule 而非 rule-strong：抬起它的是 slip 影，边只需交代轮廓。
+  # 重边 + 小圆角 = 僵硬
   composer:
     backgroundColor: '{colors.paper}'
-    borderColor: '{colors.rule-strong}'
+    borderColor: '{colors.rule}'
     textColor: '{colors.graphite}'
     typography: '{typography.body}'
-    rounded: '{rounded.lg}'
+    rounded: '{rounded.xl}'
     padding: 12px
   composer-focused:
     backgroundColor: '{colors.paper}'
     borderColor: '{colors.graphite-25}'
     textColor: '{colors.graphite}'
     typography: '{typography.body}'
-    rounded: '{rounded.lg}'
+    rounded: '{rounded.xl}'
     padding: 12px
+  # 不描边：它是压在输入卡后面的一个形状，靠底色就认得出来，
+  # 轮廓只会在接缝上多画一条线
   composer-context-chip:
     backgroundColor: '{colors.desk}'
     textColor: '{colors.graphite-70}'
-    typography: '{typography.callnum}'
-    rounded: '{rounded.md}'
+    typography: '{typography.callnum-sm}'
+    rounded: '{rounded.xl}'
     padding: 6px 10px
   composer-send:
     backgroundColor: '{colors.graphite}'
@@ -646,8 +651,9 @@ ArcKnowledge 的界面是**一间特藏阅览室的调阅台**。
 
 - {rounded.xs} 4px — 状态标签、小色块
 - {rounded.sm} 6px — 侧栏项、按钮、chunk 行
-- {rounded.md} 8px — 输入框、上下文 chip、引证卡
-- {rounded.lg} 12px — 卡片、输入器、浮层
+- {rounded.md} 8px — 输入框、引证卡
+- {rounded.lg} 12px — 卡片、浮层
+- {rounded.xl} 16px — 输入器。它是全屏最大的交互物件，按上面那条规则就该最圆。**抬头卡与输入卡必须同圆角**——两层叠着却一个 8px 一个 12px，接缝是歪的，读起来就是"僵硬"。
 - {rounded.full} — 发送键这类圆形图标键
 
 图标一律**单色描线**，1.5px 描边，与格线同源——它们是铅笔画的，不是插画。
@@ -702,9 +708,13 @@ ArcKnowledge 的界面是**一间特藏阅览室的调阅台**。
 
 ### 调阅单（输入器）
 
-{components.composer} 是堆叠的两层：{components.composer-context-chip} 是压在后面的那张卡，露出上边缘，用 {typography.callnum} 写当前空间——**它是调阅单的抬头，写明你要从哪个库房调东西**。输入框是压在上面的那张。
+{components.composer} 是堆叠的两层：{components.composer-context-chip} 是压在后面的那张卡，露出上边缘，写明你要从哪个库房调东西——**它是调阅单的抬头**。输入框是压在上面的那张。
 
-聚焦时切到 {components.composer-focused}：上层卡上浮 {motion.travel}，边框从 {colors.rule-strong} 收紧到 {colors.graphite-25}。{components.composer-send} 是石墨实心的圆键——**不是朱红的**。发送不是出处。
+**两层同圆角（{rounded.xl}），抬头不描边。** 这两条是"僵硬"与否的全部：抬头是压在后面的一个形状，靠底色就认得出来，给它描一圈轮廓只会在接缝处多画一条线；两层圆角不一致，叠起来的接缝就是歪的。
+
+**边取 {colors.rule}，不取 {colors.rule-strong}。** 抬起这张单子的是 {elevation.slip} 的影，边只负责交代轮廓。重边配小圆角，就是那种"塑料感"。
+
+聚焦时切到 {components.composer-focused}：上层卡上浮 {motion.travel}，边框从 {colors.rule} 收紧到 {colors.graphite-25}——**这一跳比原来更明显**，因为默认态更轻了。{components.composer-send} 是石墨实心的圆键——**不是朱红的**。发送不是出处。
 
 ### 空状态
 

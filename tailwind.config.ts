@@ -112,6 +112,8 @@ export default {
         sm: '6px',
         md: '8px',
         lg: '12px',
+        // 输入器专用：全屏最大的交互物件，按"越大越圆"就该最圆
+        xl: '16px',
         full: '9999px',
         // 旧系统，待迁移
         card: '12px',
