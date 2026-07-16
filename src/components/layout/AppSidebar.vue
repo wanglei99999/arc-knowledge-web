@@ -9,8 +9,6 @@ import {
   FileText,
   Search,
   Settings,
-  PanelLeftClose,
-  PanelLeftOpen,
   Library,
   SquarePen,
   Folder,
@@ -280,16 +278,6 @@ async function handleCreateSpace() {
         <Settings class="h-4 w-4 shrink-0" :stroke-width="1.5" />
         <span v-if="!appStore.sidebarCollapsed" class="truncate">设置</span>
       </RouterLink>
-
-      <button
-        type="button"
-        :aria-label="appStore.sidebarCollapsed ? '展开侧栏' : '收起侧栏'"
-        class="mt-xs flex h-8 w-full items-center justify-center rounded-sm text-graphite-45 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
-        @click="appStore.toggleSidebar"
-      >
-        <PanelLeftClose v-if="!appStore.sidebarCollapsed" class="h-4 w-4" :stroke-width="1.5" />
-        <PanelLeftOpen v-else class="h-4 w-4" :stroke-width="1.5" />
-      </button>
     </div>
   </aside>
 </template>

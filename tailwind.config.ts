@@ -153,6 +153,15 @@ export default {
         exit: 'cubic-bezier(0.4, 0, 1, 1)',
       },
 
+      // motion.travel —— 位移上限。挂在 translate 而非 spacing 下，
+      // 免得 p-travel / m-travel 这类无意义的工具类跟着生出来
+      translate: {
+        travel: '3px',
+      },
+      scale: {
+        press: '0.96',
+      },
+
       // 持续性动效唯一的合法用途：表示某件事真的正在进行。
       // 不受 220ms 约束——它不是过渡，是读数。位移为零，只有明度在动。
       keyframes: {

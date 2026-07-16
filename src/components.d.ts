@@ -29,6 +29,7 @@ declare module 'vue' {
     MessageBubble: typeof import('./components/chat/MessageBubble.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
+    ScoreBar: typeof import('./components/ui/ScoreBar.vue')['default']
     StatusBadge: typeof import('./components/document/StatusBadge.vue')['default']
     UploadZone: typeof import('./components/document/UploadZone.vue')['default']
   }
