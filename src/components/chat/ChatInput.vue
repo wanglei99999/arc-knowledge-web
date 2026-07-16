@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, nextTick } from 'vue'
-import { ArrowUp, Square, Plus, X } from 'lucide-vue-next'
+import { ArrowUp, Square, Plus, X, Paperclip, Library, Check } from 'lucide-vue-next'
 import { useSpacesStore } from '@/stores/spaces'
 import { uploadDocument } from '@/api/document'
 import { ACCEPTED_MIME, ACCEPTED_LABEL, isAccepted } from '@/lib/file-types'
@@ -21,8 +21,18 @@ const text = ref('')
 const textareaEl = ref<HTMLTextAreaElement | null>(null)
 const fileEl = ref<HTMLInputElement | null>(null)
 
-const canSend = computed(() => Boolean(text.value.trim()) && !props.disabled)
-const spaceName = computed(() => spacesStore.currentSpace?.name ?? '未选择')
+/** 一次只开一个浮层 */
+const menu = ref<'add' | 'space' | null>(null)
+
+const space = computed(() => spacesStore.currentSpace)
+
+/**
+ * /chat 的 space_id 是必填（app/api/routers/chat.py）。没有空间就发不出去，
+ * 这里必须自己挡住 —— 把注定失败的请求丢给服务器不叫容错。
+ */
+const canSend = computed(() =>
+  Boolean(text.value.trim()) && Boolean(space.value) && !props.disabled,
+)
 
 /**
  * 加进来的文档走的是入库管线，不是这条消息的附件——
@@ -55,7 +65,7 @@ function dismiss(id: string) {
 }
 
 async function ingest(file: File) {
-  const spaceId = spacesStore.currentSpace?.space_id
+  const spaceId = space.value?.space_id
   if (!spaceId) return
   const id = `${file.name}-${Date.now()}-${Math.random()}`
   uploads.value = [...uploads.value, { id, name: file.name, pct: 0, state: 'uploading' }]
@@ -69,9 +79,23 @@ async function ingest(file: File) {
 
 function onPick(e: Event) {
   const input = e.target as HTMLInputElement
-  const files = Array.from(input.files ?? [])
-  files.filter(isAccepted).forEach(ingest)
+  Array.from(input.files ?? []).filter(isAccepted).forEach(ingest)
   input.value = ''
+}
+
+function pickFiles() {
+  menu.value = null
+  fileEl.value?.click()
+}
+
+function chooseSpace(id: string) {
+  spacesStore.switchSpace(id)
+  menu.value = null
+}
+
+function clearSpace() {
+  spacesStore.clearSpace()
+  menu.value = null
 }
 
 function handleSend() {
@@ -110,13 +134,88 @@ defineExpose({ fill })
 
 <template>
   <div class="shrink-0 px-xl pb-lg pt-sm">
-    <div class="mx-auto w-full max-w-prose">
+    <div class="relative mx-auto w-full max-w-prose">
+
+      <!-- 点外面关掉浮层 -->
+      <div v-if="menu" class="fixed inset-0 z-30" @click="menu = null" />
+
+      <!-- + 的菜单 -->
+      <Transition name="overlay">
+        <div
+          v-if="menu === 'add'"
+          class="absolute bottom-full left-0 right-0 z-40 mb-sm rounded-lg border border-rule-strong bg-paper p-xs shadow-overlay"
+        >
+          <p class="px-sm py-xs text-meta text-graphite-45">添加</p>
+          <button
+            type="button"
+            :disabled="!space"
+            :class="cn(
+              'flex h-[30px] w-full items-center gap-sm rounded-sm px-sm text-body-sm',
+              'transition-colors duration-hover ease-settle motion-reduce:transition-none',
+              space ? 'text-graphite hover:bg-desk-hover' : 'cursor-not-allowed text-graphite-25',
+            )"
+            @click="pickFiles"
+          >
+            <Paperclip class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+            <span class="flex-1 text-left">文件和文件夹</span>
+            <span class="shrink-0 text-meta" :class="space ? 'text-graphite-45' : 'text-graphite-25'">
+              {{ space ? ACCEPTED_LABEL : '先选一个工作空间' }}
+            </span>
+          </button>
+        </div>
+      </Transition>
+
+      <!-- 空间选择器 -->
+      <Transition name="overlay">
+        <div
+          v-if="menu === 'space'"
+          class="absolute bottom-full left-0 z-40 mb-sm w-64 rounded-lg border border-rule-strong bg-paper p-xs shadow-overlay"
+        >
+          <p class="px-sm py-xs text-meta text-graphite-45">工作空间</p>
+          <button
+            v-for="s in spacesStore.spaces"
+            :key="s.space_id"
+            type="button"
+            class="flex h-[30px] w-full items-center gap-sm rounded-sm px-sm text-body-sm text-graphite transition-colors duration-hover ease-settle hover:bg-desk-hover motion-reduce:transition-none"
+            @click="chooseSpace(s.space_id)"
+          >
+            <Check
+              class="h-3.5 w-3.5 shrink-0"
+              :class="s.space_id === space?.space_id ? 'text-graphite' : 'text-transparent'"
+              :stroke-width="1.5"
+            />
+            <span class="min-w-0 flex-1 truncate text-left">{{ s.name }}</span>
+          </button>
+          <p v-if="!spacesStore.spaces.length" class="px-sm py-xs text-meta text-graphite-45">
+            还没有工作空间。用侧栏「知识库」旁的 + 建一个。
+          </p>
+        </div>
+      </Transition>
 
       <!-- 调阅单抬头：压在后面的那张卡，只露出上边缘。
            不描边——它靠底色就认得出来，轮廓只会在接缝上多画一条线。
            圆角与下面那张卡一致，否则接缝是歪的 -->
-      <div class="mx-md rounded-t-xl bg-desk px-md pt-xs pb-md -mb-sm">
-        <span class="font-callnum text-callnum-sm text-graphite-70">空间 / {{ spaceName }}</span>
+      <div class="mx-md flex items-center gap-sm rounded-t-xl bg-desk px-md pt-xs pb-md -mb-sm">
+        <!-- 叉：选中了才有得叉 -->
+        <button
+          v-if="space"
+          type="button"
+          :aria-label="`不限定工作空间（当前 ${space.name}）`"
+          class="grid h-4 w-4 shrink-0 place-items-center rounded-full text-graphite-45 transition-colors duration-hover ease-settle hover:bg-desk-sunken hover:text-graphite motion-reduce:transition-none"
+          @click="clearSpace"
+        >
+          <X class="h-3 w-3" :stroke-width="1.5" />
+        </button>
+        <Library v-else class="h-3.5 w-3.5 shrink-0 text-graphite-45" :stroke-width="1.5" />
+
+        <button
+          type="button"
+          :aria-expanded="menu === 'space'"
+          class="min-w-0 flex-1 truncate rounded-xs text-left font-callnum text-callnum-sm text-graphite-70 transition-colors duration-hover ease-settle hover:text-graphite motion-reduce:transition-none"
+          @click="menu = menu === 'space' ? null : 'space'"
+        >
+          {{ space?.name ?? '选择工作空间' }}
+        </button>
       </div>
 
       <!-- 输入的那张卡 -->
@@ -176,7 +275,7 @@ defineExpose({ fill })
                两者的语义差得很远，而 + 号长得就像"附件"。
                全都失败时就不必说了——那时没有任何东西进了知识库 -->
           <li v-if="anyIngesting" class="px-sm text-meta text-graphite-45">
-            文档加进的是「{{ spaceName }}」，不是这条消息。入库完成后才能被检索到。
+            文档加进的是「{{ space?.name }}」，不是这条消息。入库完成后才能被检索到。
           </li>
         </ul>
 
@@ -184,7 +283,7 @@ defineExpose({ fill })
           ref="textareaEl"
           v-model="text"
           rows="1"
-          placeholder="随心输入"
+          :placeholder="space ? '随心输入' : '先选一个工作空间'"
           :disabled="disabled && !isStreaming"
           class="block max-h-[200px] min-h-[36px] w-full resize-none bg-transparent text-body text-graphite outline-none placeholder:text-graphite-45 disabled:text-graphite-45"
           @keydown="handleKeydown"
@@ -192,13 +291,17 @@ defineExpose({ fill })
         />
 
         <div class="mt-sm flex items-center justify-between">
-          <!-- 加文档。文案说清楚它加到哪儿去，别让 + 号自己去暗示 -->
           <button
             type="button"
-            :title="`添加文档到「${spaceName}」（${ACCEPTED_LABEL}）`"
-            :aria-label="`添加文档到「${spaceName}」`"
-            class="grid h-7 w-7 place-items-center rounded-sm text-graphite-70 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
-            @click="fileEl?.click()"
+            aria-label="添加"
+            :aria-expanded="menu === 'add'"
+            :class="cn(
+              'grid h-7 w-7 place-items-center rounded-sm transition-colors duration-hover ease-settle motion-reduce:transition-none',
+              menu === 'add'
+                ? 'bg-desk-hover text-graphite'
+                : 'text-graphite-70 hover:bg-desk-hover hover:text-graphite',
+            )"
+            @click="menu = menu === 'add' ? null : 'add'"
           >
             <Plus class="h-4 w-4" :stroke-width="1.5" />
           </button>
