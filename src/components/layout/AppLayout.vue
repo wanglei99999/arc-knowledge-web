@@ -10,7 +10,7 @@ onMounted(() => spacesStore.fetchSpaces())
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden bg-surface">
+  <div class="flex h-screen overflow-hidden bg-paper">
     <!-- 侧边栏 -->
     <AppSidebar />
 

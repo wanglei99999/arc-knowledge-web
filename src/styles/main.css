@@ -14,13 +14,22 @@
   }
 
   body {
-    font-family: 'Inter', 'Noto Sans SC', sans-serif;
+    font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', sans-serif;
     -webkit-font-smoothing: antialiased;
-    background-color: #FAFAFA;
-    color: #18181B;
+    /* 纸：中性白，不是米白 */
+    background-color: #FCFCFC;
+    color: #1C1C1E;
   }
 
-  /* 滚动条美化 */
+  /* 焦点环：2px 石墨 + 2px 外偏移。16.58:1，远超 SC 1.4.11 的 3:1，且不消耗色相。
+     只在键盘导航时出现——鼠标点击不该画框。 */
+  :focus-visible {
+    outline: 2px solid theme('colors.focus');
+    outline-offset: 2px;
+    border-radius: theme('borderRadius.xs');
+  }
+
+  /* 滚动条：格线的粗细，桌板的颜色 */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -31,17 +40,42 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    background: #D4D4D8;
-    border-radius: 3px;
+    background: theme('colors.rule.strong');
+    border-radius: theme('borderRadius.full');
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #A1A1AA;
+    background: theme('colors.graphite.25');
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* 长正文的孤字处理 */
+  .text-pretty {
+    text-wrap: pretty;
+  }
+}
+
+/* 可及性：位移归零、时长归零，只留不透明度的瞬时切换。
+   呼吸是唯一的例外——它是读数，去掉等于抹掉"正在加载"这个信息，
+   而且它本来就不位移，不构成前庭刺激。 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-breathe {
+    animation: breathe 1400ms ease-in-out infinite !important;
+    animation-duration: 1400ms !important;
+    animation-iteration-count: infinite !important;
   }
 }

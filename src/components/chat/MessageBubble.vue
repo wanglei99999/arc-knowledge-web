@@ -4,111 +4,145 @@ import 'md-editor-v3/lib/preview.css'
 import CitationCard from './CitationCard.vue'
 import type { MessageVO } from '@/types/chat'
 
-const props = defineProps<{ message: MessageVO }>()
+defineProps<{ message: MessageVO }>()
 </script>
 
 <template>
-  <!-- 用户消息：右对齐 -->
+  <!-- 提问：桌板色的一小张卡，右对齐 -->
   <div v-if="message.role === 'user'" class="flex justify-end">
-    <div class="max-w-[70%] px-4 py-2.5 rounded-2xl rounded-tr-sm bg-primary text-white text-sm leading-relaxed">
+    <div class="max-w-[85%] rounded-lg bg-desk px-[14px] py-[10px] text-body text-graphite">
       {{ message.content }}
     </div>
   </div>
 
-  <!-- AI 消息：左对齐 -->
-  <div v-else class="flex gap-3">
-    <!-- 头像 -->
-    <div class="shrink-0 w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-xs font-bold mt-1">
-      AI
-    </div>
+  <!-- 回答：直接落在纸上。没有卡、没有边、没有头像——它就是桌上的那页纸 -->
+  <div v-else class="min-w-0">
+    <MdPreview
+      v-if="message.content"
+      :id="message.id"
+      :model-value="message.content"
+      :show-code-row-number="false"
+      preview-theme="default"
+      class="arc-md !bg-transparent !p-0"
+    />
 
-    <div class="flex-1 min-w-0">
-      <!-- Markdown 内容 -->
-      <div class="rounded-2xl rounded-tl-sm bg-surface-card border border-surface-border shadow-card px-4 py-3 overflow-hidden">
-        <MdPreview
-          v-if="message.content"
-          :id="message.id"
-          :model-value="message.content"
-          :show-code-row-number="false"
-          preview-theme="default"
-          class="!bg-transparent !p-0 text-zinc-700"
-        />
-        <!-- 流式输出光标 -->
-        <span
-          v-if="message.streaming && !message.content"
-          class="inline-block w-2 h-4 bg-zinc-400 animate-pulse rounded-sm"
-        />
-        <span
-          v-if="message.streaming && message.content"
-          class="inline-block w-1.5 h-4 ml-0.5 bg-zinc-400 animate-pulse rounded-sm align-middle"
-        />
-      </div>
+    <!-- 流式光标：呼吸的石墨块。它对应"字正在一个个到达"这件真事 -->
+    <span
+      v-if="message.streaming"
+      class="ml-[2px] inline-block h-4 w-[2px] animate-breathe rounded-full bg-graphite-45 align-middle"
+      aria-hidden="true"
+    />
 
-      <!-- 引用来源 -->
-      <CitationCard
-        v-if="!message.streaming && message.citations?.length"
-        :citations="message.citations"
-      />
-    </div>
+    <CitationCard
+      v-if="!message.streaming && message.citations?.length"
+      :citations="message.citations"
+    />
   </div>
 </template>
 
 <style>
-/* 覆盖 md-editor-v3 默认样式，融入设计系统 */
-.md-editor-preview-wrapper {
+/* md-editor-v3 自带一套 slate 蓝灰 + 靛蓝的默认皮肤，逐条按 DESIGN.md 覆盖。
+   作用域限定在 .arc-md 内，避免影响其他页面仍在用的旧样式。 */
+.arc-md .md-editor-preview-wrapper {
   padding: 0 !important;
 }
-.md-editor-preview {
-  font-size: 0.875rem !important;
-  line-height: 1.6 !important;
+.arc-md .md-editor-preview {
+  color: #1C1C1E !important;
+  font-family: 'IBM Plex Sans', 'IBM Plex Sans SC', sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.65 !important;
+  /* md-editor 默认 break-all，会把 `metadata filtering` 拦腰断成 filteri / ng。
+     normal 下中文照常换行，西文术语保持完整。 */
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
 }
-.md-editor-preview h2 {
-  font-size: 1rem !important;
-  font-weight: 600 !important;
-  margin-top: 0.75rem !important;
-  margin-bottom: 0.375rem !important;
+
+/* 层级靠字重和留白，不靠字号跨度。18px / 15px 就是 title-lg 与 title */
+.arc-md .md-editor-preview h1,
+.arc-md .md-editor-preview h2 {
+  font-size: 18px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  margin: 16px 0 8px !important;
 }
-.md-editor-preview h3 {
-  font-size: 0.875rem !important;
-  font-weight: 600 !important;
-  margin-top: 0.5rem !important;
-  margin-bottom: 0.25rem !important;
+.arc-md .md-editor-preview h3,
+.arc-md .md-editor-preview h4 {
+  font-size: 15px !important;
+  font-weight: 500 !important;
+  line-height: 1.4 !important;
+  margin: 12px 0 4px !important;
 }
-.md-editor-preview p {
-  margin-bottom: 0.375rem !important;
+.arc-md .md-editor-preview p {
+  margin: 0 0 8px !important;
 }
-.md-editor-preview ul,
-.md-editor-preview ol {
-  padding-left: 1.25rem !important;
-  margin-bottom: 0.375rem !important;
+/* Tailwind 的 preflight 把 list-style 清成 none，编号会整个消失。
+   Markdown 的有序列表里顺序是信息，必须还回去。 */
+.arc-md .md-editor-preview ul,
+.arc-md .md-editor-preview ol {
+  padding-left: 20px !important;
+  margin: 0 0 8px !important;
 }
-.md-editor-preview code:not(pre code) {
-  background: #f1f5f9 !important;
-  padding: 0.1em 0.3em !important;
+.arc-md .md-editor-preview ul { list-style: disc outside !important; }
+.arc-md .md-editor-preview ol { list-style: decimal outside !important; }
+.arc-md .md-editor-preview li { display: list-item !important; }
+.arc-md .md-editor-preview li::marker { color: #6C6C73 !important; }
+.arc-md .md-editor-preview a {
+  color: #1C1C1E !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px !important;
+}
+
+/* 索书号族：等宽的一切 */
+.arc-md .md-editor-preview code:not(pre code) {
+  background: #F1F1F3 !important;
+  color: #1C1C1E !important;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
+  font-size: 12px !important;
+  padding: 1px 5px !important;
   border-radius: 4px !important;
-  font-size: 0.8rem !important;
 }
-.md-editor-preview pre {
+.arc-md .md-editor-preview pre {
+  border: 1px solid #E4E4E7 !important;
   border-radius: 8px !important;
-  margin: 0.5rem 0 !important;
+  margin: 8px 0 !important;
 }
-.md-editor-preview blockquote {
-  border-left: 3px solid #6366f1 !important;
-  padding-left: 0.75rem !important;
-  color: #64748b !important;
-  margin: 0.5rem 0 !important;
+.arc-md .md-editor-preview pre code {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace !important;
+  font-size: 12px !important;
 }
-.md-editor-preview table {
-  font-size: 0.8rem !important;
+
+/* 引文的左线必须停在 1px 且不出石墨族：它是发丝格线，
+   再粗或再带色就变成规范头一条禁令里的彩色侧条。 */
+.arc-md .md-editor-preview blockquote {
+  border-left: 1px solid #D6D6DA !important;
+  /* md-editor 默认给引用块填了底。填底是失败专用的——
+     全系统只有那一处色块，引用块抢不得。 */
+  background: transparent !important;
+  padding: 0 0 0 12px !important;
+  margin: 8px 0 !important;
+  color: #5B5B61 !important;
+}
+
+/* 表格：桌上的一张表，靠格线分隔 */
+.arc-md .md-editor-preview table {
+  font-size: 13px !important;
   border-collapse: collapse !important;
   width: 100% !important;
 }
-.md-editor-preview th,
-.md-editor-preview td {
-  border: 1px solid #e2e8f0 !important;
-  padding: 0.25rem 0.5rem !important;
+.arc-md .md-editor-preview th,
+.arc-md .md-editor-preview td {
+  border: 1px solid #E4E4E7 !important;
+  padding: 4px 8px !important;
 }
-.md-editor-preview th {
-  background: #f8fafc !important;
+.arc-md .md-editor-preview th {
+  background: #F1F1F3 !important;
+  color: #5B5B61 !important;
+  font-size: 12px !important;
+  font-weight: 400 !important;
+}
+.arc-md .md-editor-preview hr {
+  border: 0 !important;
+  border-top: 1px solid #E4E4E7 !important;
+  margin: 16px 0 !important;
 }
 </style>
