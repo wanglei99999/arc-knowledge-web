@@ -254,9 +254,11 @@ components:
     typography: '{typography.body}'
     rounded: '{rounded.xl}'
     padding: 12px
+  # 焦点指示就是它自己的边，不套外框。graphite-70 是 6.57:1，SC 1.4.11
+  # 只要 3:1 —— 大件不该配近黑边，那是个黑框。graphite-25 更不行（1.92:1）
   composer-focused:
     backgroundColor: '{colors.paper}'
-    borderColor: '{colors.graphite-25}'
+    borderColor: '{colors.graphite-70}'
     textColor: '{colors.graphite}'
     typography: '{typography.body}'
     rounded: '{rounded.xl}'
@@ -746,8 +748,18 @@ ArcKnowledge 的界面是**一间特藏阅览室的调阅台**。
 
 用户是内部工程师。**工程师用键盘。**
 
-- 每个可聚焦元素都用 {components.focus-ring}：2px {colors.focus} 描边，2px 外偏移。石墨的 16.58:1 远超 SC 1.4.11 要求的 3:1，且不消耗色相。
-- **不要用 `outline: none` 而不给替代。** 焦点不可见时，键盘用户的光标凭空消失。
+- **按钮、链接、图标键**用 {components.focus-ring}：2px {colors.focus} 描边，2px 外偏移，挂在 `:focus-visible` 上——**只在键盘导航时出现，鼠标点击不画框**。
+- **文本框与输入器不套外框，焦点指示就是它自己的边**：从 {colors.rule} 收紧到 {colors.graphite-70}。
+
+  为什么不给它们套环：文本框在浏览器里**点击也算 `:focus-visible`**，而容器上的 `focus-within` 更是连点 + 号、点发送键都触发——结果是每次点击都在整张单子外面画一圈 2px 黑框。**框已经把话说完了，环只是把它说大声一遍。**
+
+  容器上的焦点态**只认那个文本框**（`has-[textarea:focus]`），不认 `focus-within`：里面的键各有各的环，容器不该跟着一起亮。
+
+- **指示的分量随元素尺寸反向缩放。** 28px 的图标键配 2px 近黑环，比例是对的；640px 的调阅单配同样的近黑边，就是一个黑框。所以小件用 {colors.focus}（16.58:1），大件用 {colors.graphite-70}（6.57:1）——**两者都远超 SC 1.4.11 要求的 3:1，剩下的余量该花在克制上。**
+
+  但收紧的目标色必须自己顶到 3:1：{colors.graphite-25} 只有 1.92:1，**不能拿它当焦点指示**，那是禁用态和装饰线的颜色。
+
+- **不要用 `outline: none` 而不给替代。** 焦点不可见时，键盘用户的光标凭空消失。用边框替代是合法的，把边框也删掉就不是。
 - 快捷键提示用 {components.kbd}。
 - 交互组件七态齐全：default / hover / focus / active / disabled / loading / error。缺一态就是缺一态。
 
@@ -782,6 +794,8 @@ RAG 是全程异步的产品，**"正在发生"必须有词汇**。
 - **Don't** 用 96px 那种段落节奏。那是落地页在制造仪式感。
 - **Don't** 拉大字号跨度来做层级。层级靠字重、位置和留白。
 - **Don't** 让失败低声说话。它是全系统唯一允许填底的东西——一份没入库的文档是知识库里一个静默的洞。
+- **Don't** 在容器上用 `focus-within` 画焦点环。**它对鼠标点击也生效**，点里面任何一个键都会让整个容器套上一圈黑框。焦点环只挂 `:focus-visible`，且只给按钮和链接。
+- **Don't** 拿 {colors.graphite-25} 当焦点指示。1.92:1，撑不起 SC 1.4.11 的 3:1——它是禁用态的颜色。
 - **Don't** 交付只有 default 态的交互组件。七态（default / hover / focus / active / disabled / loading / error）不齐就是没做完。
 - **Do** 每次要给一个东西上色时，先问**用户此刻是不是在判断它**。只是认它，就用石墨。
 
