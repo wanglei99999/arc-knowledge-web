@@ -18,7 +18,7 @@
     -webkit-font-smoothing: antialiased;
     /* 纸：中性白，不是米白 */
     background-color: #FCFCFC;
-    color: #1C1C1E;
+    color: #1C1C1C;
   }
 
   /* 焦点环：2px 石墨 + 2px 外偏移。16.58:1，远超 SC 1.4.11 的 3:1，且不消耗色相。

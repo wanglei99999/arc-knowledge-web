@@ -26,19 +26,19 @@ export default {
         // ↓↓↓ 特藏调阅台 —— DESIGN.md ↓↓↓
         paper: '#FCFCFC',
         desk: {
-          DEFAULT: '#F1F1F3',
-          hover: '#E8E8EC',
-          sunken: '#DEDEE3',
+          DEFAULT: '#F1F1F1',
+          hover: '#E8E8E8',
+          sunken: '#DEDEDE',
         },
         graphite: {
-          DEFAULT: '#1C1C1E',
-          70: '#5B5B61',
-          45: '#6C6C73',
-          25: '#B8B8BE',
+          DEFAULT: '#1C1C1C',
+          70: '#5B5B5B',
+          45: '#6C6C6C',
+          25: '#B8B8B8',
         },
         rule: {
-          DEFAULT: '#E4E4E7',
-          strong: '#D6D6DA',
+          DEFAULT: '#E4E4E4',
+          strong: '#D6D6D6',
         },
         seal: {
           DEFAULT: '#B03227',
@@ -54,7 +54,7 @@ export default {
           fill: '#FBE9E6',
           ink: '#7A2A20',
         },
-        focus: '#1C1C1E',
+        focus: '#1C1C1C',
 
         // ↓↓↓ 旧系统 —— 待迁移，勿在新代码中使用 ↓↓↓
         // 仍被 search / dashboard / document / admin 四条线引用。
@@ -83,7 +83,7 @@ export default {
         surface: {
           DEFAULT: '#FAFAFA',
           card: '#FFFFFF',
-          border: '#E4E4E7',
+          border: '#E4E4E4',
           muted: '#F4F4F5',
         },
       },
@@ -138,12 +138,12 @@ export default {
         // 实测（4x 截图逐像素）：压在桌板上从平地 240 渐暗到边缘 230，
         // 落影宽 10px，与 rule(228) 同重 —— 纸的边看得见且没有硬线；
         // 压在纸上只到 ~239，几乎无形，卡片的边仍归 rule 承担。一个值，两种底色各自做对。
-        contact: '0 1px 2px rgba(28,28,30,0.04), 0 0 24px rgba(28,28,30,0.06)',
+        contact: '0 1px 2px rgba(28,28,28,0.04), 0 0 24px rgba(28,28,28,0.06)',
         // 笔下那张单子：压在别的纸上面，微微高出一点。
         // 偏移封顶 2px —— 它是压着，不是飘着。"不浮"针对的是动作（聚焦不跳），
         // 不是存在感：一张压在别的纸上面的单子当然有影
-        slip: '0 2px 6px rgba(28,28,30,0.06), 0 0 20px rgba(28,28,30,0.05)',
-        overlay: '0 4px 16px rgba(28,28,30,0.08)',
+        slip: '0 2px 6px rgba(28,28,28,0.06), 0 0 20px rgba(28,28,28,0.05)',
+        overlay: '0 4px 16px rgba(28,28,28,0.08)',
         // 旧系统，待迁移
         card: '0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04)',
         'card-hover': '0 4px 12px rgba(0,0,0,0.10)',
