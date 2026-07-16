@@ -78,22 +78,25 @@ onMounted(() => scrollToBottom(false))
         <h1 class="text-display text-balance text-graphite-45">今天要查什么？</h1>
 
         <!-- 引导卡：草稿一有字就退场——人已经想好了，卡片就成了噪音。
-             淡出别硬闪；开始打字时它平静地让开，不是被打断 -->
-        <Transition name="intents">
-          <div v-if="!draft.trim()" class="mt-xl grid gap-sm sm:grid-cols-2">
-            <button
-              v-for="intent in intents"
-              :key="intent.label"
-              type="button"
-              class="rounded-lg border border-rule bg-paper p-[14px] text-left shadow-contact transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
-              @click="pickIntent(intent.question)"
-            >
-              <component :is="intent.icon" :class="['h-[18px] w-[18px]', intent.tone]" :stroke-width="1.5" />
-              <p class="mt-sm text-label text-graphite">{{ intent.label }}</p>
-              <p class="mt-xxs text-meta text-graphite-45">{{ intent.question }}</p>
-            </button>
-          </div>
-        </Transition>
+             只淡不移，且退场时保留占位：标题跟卡片一起被 justify-center 居中，
+             若把卡片移出文档流，标题会下移补位。inert 一并挡掉隐藏后的聚焦与点击。 -->
+        <div
+          class="mt-xl grid gap-sm transition-opacity duration-standard ease-settle motion-reduce:transition-none sm:grid-cols-2"
+          :class="draft.trim() ? 'opacity-0' : 'opacity-100'"
+          :inert="Boolean(draft.trim())"
+        >
+          <button
+            v-for="intent in intents"
+            :key="intent.label"
+            type="button"
+            class="rounded-lg border border-rule bg-paper p-[14px] text-left shadow-contact transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
+            @click="pickIntent(intent.question)"
+          >
+            <component :is="intent.icon" :class="['h-[18px] w-[18px]', intent.tone]" :stroke-width="1.5" />
+            <p class="mt-sm text-label text-graphite">{{ intent.label }}</p>
+            <p class="mt-xxs text-meta text-graphite-45">{{ intent.question }}</p>
+          </button>
+        </div>
       </div>
 
       <div v-else class="mx-auto max-w-prose space-y-xl">
