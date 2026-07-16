@@ -9,6 +9,9 @@ const store = useChatStore()
 const messagesEl = ref<HTMLElement | null>(null)
 const inputEl = ref<InstanceType<typeof ChatInput> | null>(null)
 
+/** 输入框的草稿。它一有字，就说明人已经想好要问什么，引导卡该退场了 */
+const draft = ref('')
+
 /**
  * 四个动作要在一眼之内被区分——这正是"用户此刻在判断它"的定义，
  * 也是类型色在全屏唯一一次出场的理由。
@@ -74,19 +77,23 @@ onMounted(() => scrollToBottom(false))
       >
         <h1 class="text-display text-balance text-graphite-45">今天要查什么？</h1>
 
-        <div class="mt-xl grid gap-sm sm:grid-cols-2">
-          <button
-            v-for="intent in intents"
-            :key="intent.label"
-            type="button"
-            class="rounded-lg border border-rule bg-paper p-[14px] text-left shadow-contact transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
-            @click="pickIntent(intent.question)"
-          >
-            <component :is="intent.icon" :class="['h-[18px] w-[18px]', intent.tone]" :stroke-width="1.5" />
-            <p class="mt-sm text-label text-graphite">{{ intent.label }}</p>
-            <p class="mt-xxs text-meta text-graphite-45">{{ intent.question }}</p>
-          </button>
-        </div>
+        <!-- 引导卡：草稿一有字就退场——人已经想好了，卡片就成了噪音。
+             淡出别硬闪；开始打字时它平静地让开，不是被打断 -->
+        <Transition name="intents">
+          <div v-if="!draft.trim()" class="mt-xl grid gap-sm sm:grid-cols-2">
+            <button
+              v-for="intent in intents"
+              :key="intent.label"
+              type="button"
+              class="rounded-lg border border-rule bg-paper p-[14px] text-left shadow-contact transition-colors duration-hover ease-settle hover:border-rule-strong hover:bg-desk motion-reduce:transition-none"
+              @click="pickIntent(intent.question)"
+            >
+              <component :is="intent.icon" :class="['h-[18px] w-[18px]', intent.tone]" :stroke-width="1.5" />
+              <p class="mt-sm text-label text-graphite">{{ intent.label }}</p>
+              <p class="mt-xxs text-meta text-graphite-45">{{ intent.question }}</p>
+            </button>
+          </div>
+        </Transition>
       </div>
 
       <div v-else class="mx-auto max-w-prose space-y-xl">
@@ -100,6 +107,7 @@ onMounted(() => scrollToBottom(false))
 
     <ChatInput
       ref="inputEl"
+      v-model:text="draft"
       :disabled="false"
       :is-streaming="store.isStreaming"
       @send="handleSend"
