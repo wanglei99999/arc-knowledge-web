@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { ChevronDown } from 'lucide-vue-next'
+import ScoreBar from '@/components/ui/ScoreBar.vue'
 import type { Citation } from '@/types/chat'
 import { cn } from '@/lib/utils'
 
@@ -66,18 +67,7 @@ const ranked = computed(() =>
             {{ cite.doc_name }} · #{{ cite.chunk_index + 1 }}
           </span>
 
-          <!-- 分数用长度，不用深浅。白底上装不下 0.00–1.00 的连续量，这是算术 -->
-          <span class="flex shrink-0 items-center gap-sm">
-            <span class="h-[3px] w-12 overflow-hidden rounded-full bg-desk-sunken">
-              <span
-                class="block h-full rounded-full bg-graphite-70"
-                :style="{ width: `${Math.max(0, Math.min(1, cite.score)) * 100}%` }"
-              />
-            </span>
-            <span class="font-callnum text-callnum text-graphite-70 tabular-nums">
-              {{ cite.score.toFixed(2) }}
-            </span>
-          </span>
+          <ScoreBar :score="cite.score" />
         </div>
 
         <!-- 原件。不高亮、不划线、不改一个像素 -->

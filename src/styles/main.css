@@ -49,6 +49,34 @@
   }
 }
 
+/* 浮层进出：3px 上浮 + 淡入。浮层是唯一真正离开桌面的东西，
+   也是唯一有进出动效的——桌上的纸是被放下的，不是飞进来的。
+   进场陡起缓落（落定），退场直接走。 */
+.overlay-enter-active {
+  transition:
+    opacity   theme('transitionDuration.overlay') theme('transitionTimingFunction.settle'),
+    transform theme('transitionDuration.overlay') theme('transitionTimingFunction.settle');
+}
+.overlay-leave-active {
+  transition:
+    opacity   theme('transitionDuration.overlay') theme('transitionTimingFunction.exit'),
+    transform theme('transitionDuration.overlay') theme('transitionTimingFunction.exit');
+}
+.overlay-enter-from,
+.overlay-leave-to {
+  opacity: 0;
+  transform: translateY(theme('translate.travel'));
+}
+
+/* 可及性：位移归零，只留淡入淡出。全局那条 reduce 规则只压时长，
+   压不掉 transform，得单独关。 */
+@media (prefers-reduced-motion: reduce) {
+  .overlay-enter-from,
+  .overlay-leave-to {
+    transform: none;
+  }
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

@@ -76,7 +76,7 @@ defineExpose({ fill })
           // 焦点环走 focus-ring token：2px 石墨、2px 外偏移。
           // 边框收紧只是装饰，graphite-25 是 1.92:1，撑不起 SC 1.4.11
           'focus-within:outline focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-focus',
-          'focus-within:-translate-y-[3px] focus-within:border-graphite-25',
+          'focus-within:-translate-y-travel focus-within:border-graphite-25',
           'border-rule-strong',
         )"
       >
@@ -96,7 +96,7 @@ defineExpose({ fill })
           v-if="isStreaming"
           type="button"
           aria-label="停止生成"
-          class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-graphite text-paper transition-transform duration-hover ease-settle active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100"
+          class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-graphite text-paper transition-transform duration-hover ease-settle active:scale-press motion-reduce:transition-none motion-reduce:active:scale-100"
           @click="emit('stop')"
         >
           <Square class="h-3 w-3 fill-current" :stroke-width="1.5" />
@@ -113,7 +113,7 @@ defineExpose({ fill })
             'transition-[background-color,transform] duration-hover ease-settle',
             'motion-reduce:transition-none motion-reduce:active:scale-100',
             canSend
-              ? 'bg-graphite text-paper hover:bg-graphite-70 active:scale-[0.96]'
+              ? 'bg-graphite text-paper hover:bg-graphite-70 active:scale-press'
               : 'cursor-not-allowed bg-desk-sunken text-graphite-45',
           )"
           @click="handleSend"
