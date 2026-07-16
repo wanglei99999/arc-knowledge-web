@@ -119,12 +119,12 @@ defineExpose({ fill })
         <span class="font-callnum text-callnum-sm text-graphite-70">空间 / {{ spaceName }}</span>
       </div>
 
-      <!-- 输入的那张卡。聚焦时上浮 3px，边框从 rule-strong 收紧到 graphite-25 -->
+      <!-- 输入的那张卡 -->
       <div
         :class="cn(
-          // 单子平放在纸上：contact 的接触影，不浮。它不是浮层，
-          // 没有理由离开桌面
-          'relative rounded-xl border bg-paper p-md shadow-contact',
+          // 它压在纸上，用 slip 的影 ——「不浮」说的是动作（聚焦不跳），
+          // 不是存在感：一张压在别的纸上面的单子当然有影
+          'relative rounded-xl border bg-paper p-md shadow-slip',
           'transition-colors duration-standard ease-settle motion-reduce:transition-none',
           // 焦点指示是光标本身：它是石墨的，16.58:1，闪在你要打字的地方。
           // 边只是补一格（rule → rule-strong），不承担 SC 1.4.11 ——
@@ -132,7 +132,7 @@ defineExpose({ fill })
           // 就是一条黑线。有光标的用光标，没光标的（按钮、链接）才用环。
           // 只认 textarea：focus-within 连点 + 号都会让整张单子跟着变
           'has-[textarea:focus]:border-rule-strong',
-          // 轮廓由接触影加这道浅边合力交代 —— 重边配小圆角就是塑料感
+          // 轮廓由 slip 的影加这道浅边合力交代 —— 重边配小圆角就是塑料感
           'border-rule',
         )"
       >
@@ -183,10 +183,10 @@ defineExpose({ fill })
         <textarea
           ref="textareaEl"
           v-model="text"
-          rows="2"
+          rows="1"
           placeholder="随心输入"
           :disabled="disabled && !isStreaming"
-          class="block max-h-[200px] min-h-[52px] w-full resize-none bg-transparent text-body text-graphite outline-none placeholder:text-graphite-45 disabled:text-graphite-45"
+          class="block max-h-[200px] min-h-[36px] w-full resize-none bg-transparent text-body text-graphite outline-none placeholder:text-graphite-45 disabled:text-graphite-45"
           @keydown="handleKeydown"
           @input="resize"
         />
