@@ -29,7 +29,7 @@ ArcKnowledge 知识库管理平台前端，基于 Vue 3 + TypeScript 构建。
 # 安装依赖
 npm install
 
-# 启动开发服务器（端口 3000）
+# 启动开发服务器（端口 3300）
 npm run dev
 
 # 构建
