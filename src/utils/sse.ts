@@ -11,15 +11,14 @@ export interface StreamCallbacks {
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
-export function streamChat(
-  sessionId: string,
-  question: string,
+function consumeChatStream(
+  url: string,
+  body: unknown | undefined,
   callbacks: StreamCallbacks,
 ): () => void {
   const controller = new AbortController()
   const appStore = useAppStore()
   const authStore = useAuthStore()
-  const spacesStore = useSpacesStore()
 
   ;(async () => {
     try {
@@ -31,17 +30,11 @@ export function streamChat(
         headers['Authorization'] = `Bearer ${authStore.accessToken}`
       }
 
-      const res = await fetch(`${API_BASE}/chat`, {
+      const res = await fetch(`${API_BASE}${url}`, {
         method: 'POST',
         signal: controller.signal,
         headers,
-        body: JSON.stringify({
-          query: question,
-          space_id: spacesStore.currentSpace?.space_id ?? '',
-          session_id: sessionId,
-          top_k: 10,
-          score_threshold: 0.0,
-        }),
+        body: body === undefined ? undefined : JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -79,11 +72,19 @@ export function streamChat(
 
           try {
             const json = JSON.parse(payload)
-            if (typeof json.delta === 'string') {
+            if (typeof json.error === 'string') {
+              await reader.cancel()
+              callbacks.onError(new Error(json.error))
+              return
+            } else if (typeof json.delta === 'string') {
               parts.push(json.delta)
               callbacks.onChunk(json.delta)
             } else if (Array.isArray(json.citations)) {
-              citations = json.citations
+              citations = json.citations.map((citation: Citation) => ({
+                ...citation,
+                chunk_index:
+                  citation.chunk_index ?? Math.max((citation.rank ?? 1) - 1, 0),
+              }))
             }
           } catch {
             // 忽略非 JSON 行
@@ -100,4 +101,34 @@ export function streamChat(
   })()
 
   return () => controller.abort()
+}
+
+export function streamChat(
+  sessionId: string,
+  question: string,
+  callbacks: StreamCallbacks,
+): () => void {
+  const spacesStore = useSpacesStore()
+  return consumeChatStream(
+    '/chat',
+    {
+      query: question,
+      space_id: spacesStore.currentSpace?.space_id ?? '',
+      session_id: sessionId,
+      top_k: 10,
+      score_threshold: 0.0,
+    },
+    callbacks,
+  )
+}
+
+export function streamTurnAnswer(
+  turnId: string,
+  callbacks: StreamCallbacks,
+): () => void {
+  return consumeChatStream(
+    `/chat/turns/${encodeURIComponent(turnId)}/answer`,
+    undefined,
+    callbacks,
+  )
 }
