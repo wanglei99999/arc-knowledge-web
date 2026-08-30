@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
@@ -10,7 +10,10 @@ const messagesEl = ref<HTMLElement | null>(null)
 const inputEl = ref<InstanceType<typeof ChatInput> | null>(null)
 
 /** 输入框的草稿。它一有字，就说明人已经想好要问什么，引导卡该退场了 */
-const draft = ref('')
+const draft = computed({
+  get: () => store.activeDraft,
+  set: value => { store.activeDraft = value },
+})
 
 /**
  * 四个动作要在一眼之内被区分——这正是"用户此刻在判断它"的定义，
@@ -113,6 +116,7 @@ onMounted(() => scrollToBottom(false))
       v-model:text="draft"
       :disabled="false"
       :is-streaming="store.isStreaming"
+      :send-disabled="store.sessionBusy"
       @send="handleSend"
       @stop="store.stopGeneration()"
     />

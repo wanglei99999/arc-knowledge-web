@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 const props = defineProps<{
   disabled: boolean
   isStreaming: boolean
+  sendDisabled?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -45,7 +46,10 @@ const isNewConversation = computed(() => !chatStore.activeSessionId)
  * 这里必须自己挡住 —— 把注定失败的请求丢给服务器不叫容错。
  */
 const canSend = computed(() =>
-  Boolean(text.value.trim()) && Boolean(space.value) && !props.disabled,
+  Boolean(text.value.trim())
+    && Boolean(space.value)
+    && !props.disabled
+    && !props.sendDisabled,
 )
 
 /**

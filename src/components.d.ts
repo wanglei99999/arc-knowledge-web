@@ -30,6 +30,7 @@ declare module 'vue' {
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScoreBar: typeof import('./components/ui/ScoreBar.vue')['default']
+    SessionNotificationDot: typeof import('./components/layout/SessionNotificationDot.vue')['default']
     StatusBadge: typeof import('./components/document/StatusBadge.vue')['default']
     UploadZone: typeof import('./components/document/UploadZone.vue')['default']
   }

@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useSpacesStore } from '@/stores/spaces'
 import { useChatStore } from '@/stores/chat'
+import SessionNotificationDot from '@/components/layout/SessionNotificationDot.vue'
 import {
   LayoutDashboard,
   FileText,
@@ -249,6 +250,10 @@ async function handleCreateSpace() {
                 @click="openSession(session.id)"
               >
                 <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
+                <SessionNotificationDot
+                  v-if="chatStore.sessionNotification(session.id)"
+                  :status="chatStore.sessionNotification(session.id)!"
+                />
                 <button
                   type="button"
                   :aria-label="`删除会话 ${session.title}`"
