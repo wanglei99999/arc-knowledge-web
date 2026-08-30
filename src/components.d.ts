@@ -26,12 +26,14 @@ declare module 'vue' {
     ATabs: typeof import('ant-design-vue/es')['Tabs']
     ChatInput: typeof import('./components/chat/ChatInput.vue')['default']
     CitationCard: typeof import('./components/chat/CitationCard.vue')['default']
+    MessageAttachment: typeof import('./components/chat/MessageAttachment.vue')['default']
     MessageBubble: typeof import('./components/chat/MessageBubble.vue')['default']
     RouterLink: typeof import('vue-router')['RouterLink']
     RouterView: typeof import('vue-router')['RouterView']
     ScoreBar: typeof import('./components/ui/ScoreBar.vue')['default']
     SessionNotificationDot: typeof import('./components/layout/SessionNotificationDot.vue')['default']
     StatusBadge: typeof import('./components/document/StatusBadge.vue')['default']
+    TurnRecoveryActions: typeof import('./components/chat/TurnRecoveryActions.vue')['default']
     UploadZone: typeof import('./components/document/UploadZone.vue')['default']
   }
 }

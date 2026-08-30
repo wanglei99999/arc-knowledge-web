@@ -46,9 +46,13 @@ function ensureSession() {
   if (!store.activeSessionId && !store.pendingNew) store.newSession()
 }
 
-function handleSend(content: string) {
+function handleSend(content: string, files: File[]) {
   ensureSession()
-  store.sendMessage(content)
+  if (files.length) {
+    void store.submitTurn(content, files)
+    return
+  }
+  void store.sendMessage(content)
 }
 
 function pickIntent(question: string) {
@@ -107,6 +111,11 @@ onMounted(() => scrollToBottom(false))
           v-for="msg in store.messages"
           :key="msg.id"
           :message="msg"
+          @retry-attachment="store.retryAttachment"
+          @retry-upload="store.retryUpload"
+          @ignore-attachment="store.ignoreAttachment"
+          @add-attachments="store.addAttachments"
+          @cancel-turn="store.cancelTurn"
         />
       </div>
     </div>

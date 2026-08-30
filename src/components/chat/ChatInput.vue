@@ -3,7 +3,6 @@ import { ref, computed, nextTick } from 'vue'
 import { ArrowUp, Square, Plus, X, Paperclip, Library, Check } from 'lucide-vue-next'
 import { useSpacesStore } from '@/stores/spaces'
 import { useChatStore } from '@/stores/chat'
-import { uploadDocument } from '@/api/document'
 import { ACCEPTED_MIME, ACCEPTED_LABEL, isAccepted } from '@/lib/file-types'
 import { cn } from '@/lib/utils'
 
@@ -14,7 +13,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  send: [content: string]
+  send: [content: string, files: File[]]
   stop: []
 }>()
 
@@ -52,52 +51,26 @@ const canSend = computed(() =>
     && !props.sendDisabled,
 )
 
-/**
- * 加进来的文档走的是入库管线，不是这条消息的附件——
- * /chat 只收 query 和 space_id，模型永远看不到文件本身。
- * 所以这里的状态只到"交给管线"为止，后面的解析/分片/向量化归文档管理。
- */
-interface Upload {
+/** 输入框只保管浏览器里的 File；真正创建附件记录和上传发生在发送之后。 */
+interface PendingAttachment {
   id: string
-  name: string
-  pct: number
-  state: 'uploading' | 'queued' | 'failed'
-  reason?: string
+  file: File
 }
-const uploads = ref<Upload[]>([])
-
-/** 只有真进了管线，"加的是知识库不是这条消息"这句话才需要说 */
-const anyIngesting = computed(() => uploads.value.some(u => u.state !== 'failed'))
-
-function reasonOf(err: unknown): string {
-  const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-  return detail || '连不上服务器'
-}
-
-function patch(id: string, next: Partial<Upload>) {
-  uploads.value = uploads.value.map(u => (u.id === id ? { ...u, ...next } : u))
-}
+const pendingAttachments = ref<PendingAttachment[]>([])
 
 function dismiss(id: string) {
-  uploads.value = uploads.value.filter(u => u.id !== id)
-}
-
-async function ingest(file: File) {
-  const spaceId = space.value?.space_id
-  if (!spaceId) return
-  const id = `${file.name}-${Date.now()}-${Math.random()}`
-  uploads.value = [...uploads.value, { id, name: file.name, pct: 0, state: 'uploading' }]
-  try {
-    await uploadDocument(file, spaceId, pct => patch(id, { pct }))
-    patch(id, { pct: 100, state: 'queued' })
-  } catch (err) {
-    patch(id, { state: 'failed', reason: reasonOf(err) })
-  }
+  pendingAttachments.value = pendingAttachments.value.filter(item => item.id !== id)
 }
 
 function onPick(e: Event) {
   const input = e.target as HTMLInputElement
-  Array.from(input.files ?? []).filter(isAccepted).forEach(ingest)
+  const selected = Array.from(input.files ?? [])
+    .filter(isAccepted)
+    .map(file => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${Date.now()}-${Math.random()}`,
+      file,
+    }))
+  pendingAttachments.value = [...pendingAttachments.value, ...selected]
   input.value = ''
 }
 
@@ -118,8 +91,9 @@ function clearSpace() {
 
 function handleSend() {
   if (!canSend.value) return
-  emit('send', text.value.trim())
+  emit('send', text.value.trim(), pendingAttachments.value.map(item => item.file))
   text.value = ''
+  pendingAttachments.value = []
   nextTick(resize)
 }
 
@@ -256,47 +230,32 @@ defineExpose({ fill })
           'border-rule',
         )"
       >
-        <!-- 入库中的文档 -->
-        <ul v-if="uploads.length" class="mb-md space-y-xs">
+        <!-- 还停留在输入框中的本轮附件；发送后由消息区接管它们的入库状态。 -->
+        <ul v-if="pendingAttachments.length" class="mb-md space-y-xs">
           <li
-            v-for="u in uploads"
-            :key="u.id"
-            :class="cn(
-              'flex items-center gap-sm rounded-sm px-sm py-xs',
-              u.state === 'failed' ? 'bg-alert-fill' : 'bg-desk',
-            )"
+            v-for="attachment in pendingAttachments"
+            :key="attachment.id"
+            class="flex items-center gap-sm rounded-sm bg-desk px-sm py-xs"
           >
             <span
-              class="min-w-0 flex-1 truncate font-callnum text-callnum-sm"
-              :class="u.state === 'failed' ? 'text-alert-ink' : 'text-graphite-70'"
+              class="min-w-0 flex-1 truncate font-callnum text-callnum-sm text-graphite-70"
             >
-              {{ u.name }}
+              {{ attachment.file.name }}
             </span>
-
-            <span v-if="u.state === 'uploading'" class="h-[2px] w-16 overflow-hidden rounded-full bg-desk-sunken">
-              <span
-                class="block h-full rounded-full bg-graphite-70 transition-[width] duration-standard ease-settle motion-reduce:transition-none"
-                :style="{ width: `${u.pct}%` }"
-              />
-            </span>
-            <span v-else-if="u.state === 'queued'" class="shrink-0 text-meta text-graphite-45">正在入库</span>
-            <span v-else class="shrink-0 text-meta text-alert-ink">{{ u.reason }}，重新选一次</span>
+            <span class="shrink-0 text-meta text-graphite-45">待发送</span>
 
             <button
               type="button"
-              :aria-label="`移除 ${u.name}`"
+              :aria-label="`移除 ${attachment.file.name}`"
               class="grid h-5 w-5 shrink-0 place-items-center rounded-xs text-graphite-45 transition-colors duration-hover ease-settle hover:text-graphite motion-reduce:transition-none"
-              @click="dismiss(u.id)"
+              @click="dismiss(attachment.id)"
             >
               <X class="h-3 w-3" :stroke-width="1.5" />
             </button>
           </li>
 
-          <!-- 加进来的文档进的是知识库，不是这条消息。这句话不能省：
-               两者的语义差得很远，而 + 号长得就像"附件"。
-               全都失败时就不必说了——那时没有任何东西进了知识库 -->
-          <li v-if="anyIngesting" class="px-sm text-meta text-graphite-45">
-            文档加进的是「{{ space?.name }}」，不是这条消息。入库完成后才能被检索到。
+          <li class="px-sm text-meta text-graphite-45">
+            文件会随这条消息发送，入库完成后自动回答。
           </li>
         </ul>
 

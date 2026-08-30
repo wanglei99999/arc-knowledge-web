@@ -14,6 +14,7 @@ const chatApi = vi.hoisted(() => ({
   createChatTurn: vi.fn(),
   getChatTurn: vi.fn(),
   uploadTurnAttachment: vi.fn(),
+  addTurnAttachment: vi.fn(),
   retryTurnAttachment: vi.fn(),
   ignoreTurnAttachment: vi.fn(),
   cancelChatTurn: vi.fn(),
@@ -404,5 +405,240 @@ describe('chat store multi-session runtime', () => {
     await vi.advanceTimersByTimeAsync(2_000)
 
     expect(store.sessionNotification('session-a')).toBe('failed_unread')
+  })
+
+  it('retries a failed indexed document and resumes turn polling', async () => {
+    vi.useFakeTimers()
+    const store = setupStore()
+    const failedAttachment = {
+      ...attachment,
+      status: 'failed' as const,
+      error_message: '索引失败',
+    }
+    const failedTurn = turn({
+      readiness: 'blocked',
+      attachments: [failedAttachment],
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'waiting_files',
+      attachments: [failedAttachment],
+    }]
+    const ingestingTurn = turn({
+      attachments: [{
+        ...attachment,
+        status: 'ingesting',
+        error_message: null,
+      }],
+    })
+    chatApi.retryTurnAttachment.mockResolvedValue(ingestingTurn)
+
+    await store.retryAttachment('turn-1', 'attachment-1')
+
+    expect(chatApi.retryTurnAttachment).toHaveBeenCalledWith('turn-1', 'attachment-1')
+    expect(store.messagesBySession['session-a'][0].attachments?.[0]).toMatchObject({
+      status: 'ingesting',
+      error_message: null,
+    })
+    expect(store.isSessionBusy('session-a')).toBe(true)
+  })
+
+  it('ignores a failed attachment and synchronizes the user message', async () => {
+    const store = setupStore()
+    const failedAttachment = {
+      ...attachment,
+      status: 'failed' as const,
+      error_message: '索引失败',
+    }
+    const failedTurn = turn({
+      readiness: 'blocked',
+      attachments: [failedAttachment],
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'waiting_files',
+      attachments: [failedAttachment],
+    }]
+    const ignoredTurn = turn({
+      readiness: 'empty',
+      attachments: [{
+        ...attachment,
+        status: 'ignored',
+        ignored: true,
+        error_message: null,
+      }],
+    })
+    chatApi.ignoreTurnAttachment.mockResolvedValue(ignoredTurn)
+
+    await store.ignoreAttachment('turn-1', 'attachment-1')
+
+    expect(chatApi.ignoreTurnAttachment).toHaveBeenCalledWith('turn-1', 'attachment-1')
+    expect(store.messagesBySession['session-a'][0].attachments?.[0]).toMatchObject({
+      status: 'ignored',
+      ignored: true,
+      error_message: null,
+    })
+  })
+
+  it('re-uploads a newly selected file after upload failed before document linking', async () => {
+    vi.useFakeTimers()
+    const store = setupStore()
+    const failedUpload = {
+      ...attachment,
+      document_id: null,
+      status: 'failed' as const,
+      error_message: '文件上传失败，请重试',
+    }
+    const failedTurn = turn({
+      readiness: 'blocked',
+      attachments: [failedUpload],
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'waiting_files',
+      attachments: [failedUpload],
+    }]
+    const file = new File(['data'], 'report.pdf', { type: 'application/pdf' })
+    const ingestingTurn = turn({
+      attachments: [{
+        ...attachment,
+        status: 'ingesting',
+        error_message: null,
+      }],
+    })
+    chatApi.uploadTurnAttachment.mockImplementation(
+      async (_turnId: string, _attachmentId: string, _file: File, onProgress: (value: number) => void) => {
+        onProgress(60)
+        return ingestingTurn
+      },
+    )
+
+    await store.retryUpload('turn-1', 'attachment-1', file)
+
+    expect(chatApi.uploadTurnAttachment).toHaveBeenCalledWith(
+      'turn-1',
+      'attachment-1',
+      file,
+      expect.any(Function),
+    )
+    expect(store.messagesBySession['session-a'][0].attachments?.[0]).toMatchObject({
+      status: 'ingesting',
+      error_message: null,
+    })
+  })
+
+  it('adds a replacement attachment to the existing turn and uploads it', async () => {
+    vi.useFakeTimers()
+    vi.spyOn(crypto, 'randomUUID').mockReturnValue(
+      'client-added' as `${string}-${string}-${string}-${string}-${string}`,
+    )
+    const store = setupStore()
+    const failedAttachment = {
+      ...attachment,
+      status: 'failed' as const,
+      error_message: '索引失败',
+    }
+    const failedTurn = turn({
+      readiness: 'blocked',
+      attachments: [failedAttachment],
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'waiting_files',
+      attachments: [failedAttachment],
+    }]
+    const file = new File(['data'], 'replacement.pdf', { type: 'application/pdf' })
+    const addedAttachment = {
+      attachment_id: 'attachment-2',
+      client_id: 'client-added',
+      document_id: null,
+      file_name: 'replacement.pdf',
+      mime_type: 'application/pdf',
+      file_size: 4,
+      status: 'pending_upload' as const,
+      ignored: false,
+      error_message: null,
+    }
+    chatApi.addTurnAttachment.mockResolvedValue(turn({
+      readiness: 'blocked',
+      attachments: [failedAttachment, addedAttachment],
+    }))
+    chatApi.uploadTurnAttachment.mockResolvedValue(turn({
+      readiness: 'blocked',
+      attachments: [failedAttachment, {
+        ...addedAttachment,
+        document_id: 'document-2',
+        status: 'ingesting',
+      }],
+    }))
+
+    await store.addAttachments('turn-1', [file])
+
+    expect(chatApi.addTurnAttachment).toHaveBeenCalledWith('turn-1', {
+      client_id: 'client-added',
+      file_name: 'replacement.pdf',
+      mime_type: 'application/pdf',
+      file_size: 4,
+    })
+    expect(chatApi.uploadTurnAttachment).toHaveBeenCalledWith(
+      'turn-1',
+      'attachment-2',
+      file,
+      expect.any(Function),
+    )
+    expect(store.messagesBySession['session-a'][0].attachments?.[1]).toMatchObject({
+      attachment_id: 'attachment-2',
+      status: 'ingesting',
+    })
+  })
+
+  it('cancels an unrecoverable turn and unlocks its session', async () => {
+    const store = setupStore()
+    const failedAttachment = {
+      ...attachment,
+      status: 'failed' as const,
+      error_message: '索引失败',
+    }
+    const failedTurn = turn({
+      readiness: 'blocked',
+      attachments: [failedAttachment],
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'waiting_files',
+      attachments: [failedAttachment],
+    }]
+    chatApi.cancelChatTurn.mockResolvedValue(turn({
+      readiness: 'blocked',
+      processing_status: 'cancelled',
+      attachments: [failedAttachment],
+    }))
+
+    expect(store.isSessionBusy('session-a')).toBe(true)
+    await store.cancelTurn('turn-1')
+
+    expect(chatApi.cancelChatTurn).toHaveBeenCalledWith('turn-1')
+    expect(store.messagesBySession['session-a'][0].processing_status).toBe('cancelled')
+    expect(store.isSessionBusy('session-a')).toBe(false)
   })
 })
