@@ -1,11 +1,44 @@
 export type MessageRole = 'user' | 'assistant'
 
 export interface Citation {
-  doc_id: string
-  doc_name: string
+  doc_id: string | null
+  chunk_id?: string | null
+  doc_name: string | null
   chunk_index: number
   content: string
   score: number
+  source?: string
+  rank?: number
+}
+
+export type AttachmentStatus =
+  | 'pending_upload'
+  | 'uploading'
+  | 'ingesting'
+  | 'indexed'
+  | 'failed'
+  | 'ignored'
+
+export type TurnReadiness = 'ingesting' | 'blocked' | 'ready' | 'empty'
+
+export type TurnProcessingStatus =
+  | 'waiting_files'
+  | 'answering'
+  | 'completed'
+  | 'answer_failed'
+  | 'cancelled'
+
+export interface AttachmentVO {
+  attachment_id: string
+  client_id: string
+  document_id: string | null
+  file_name: string
+  mime_type: string
+  file_size: number
+  status: AttachmentStatus
+  ignored: boolean
+  error_message: string | null
+  progress?: number
 }
 
 export interface MessageVO {
@@ -15,6 +48,33 @@ export interface MessageVO {
   created_at: string
   citations?: Citation[]
   streaming?: boolean
+  processing_status?: TurnProcessingStatus | null
+  processing_error?: string | null
+  attachments?: AttachmentVO[]
+}
+
+export interface ChatTurnVO {
+  turn_id: string
+  session_id: string
+  space_id: string
+  query: string
+  readiness: TurnReadiness
+  processing_status: TurnProcessingStatus
+  processing_error: string | null
+  attachments: AttachmentVO[]
+  assistant: MessageVO | null
+}
+
+export type AttachmentDeclaration = Pick<
+  AttachmentVO,
+  'client_id' | 'file_name' | 'mime_type' | 'file_size'
+>
+
+export interface CreateChatTurnPayload {
+  client_request_id: string
+  session_id: string
+  query: string
+  attachments: AttachmentDeclaration[]
 }
 
 export interface SessionVO {
