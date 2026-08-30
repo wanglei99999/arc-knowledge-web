@@ -5,10 +5,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import { useSpacesStore } from '@/stores/spaces'
 
-vi.mock('@/api/document', () => ({ uploadDocument: vi.fn() }))
+const documentApi = vi.hoisted(() => ({ uploadDocument: vi.fn() }))
 
-describe('ChatInput while the current session is busy', () => {
+vi.mock('@/api/document', () => documentApi)
+
+describe('ChatInput', () => {
   beforeEach(() => {
+    documentApi.uploadDocument.mockReset()
     localStorage.clear()
     setActivePinia(createPinia())
     const spacesStore = useSpacesStore()
@@ -48,5 +51,51 @@ describe('ChatInput while the current session is busy', () => {
 
     expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('button[aria-label="发送"]').attributes('disabled')).toBeDefined()
+  })
+
+  it('stages selected files locally instead of uploading them immediately', async () => {
+    const wrapper = mount(ChatInput, {
+      props: {
+        disabled: false,
+        isStreaming: false,
+        text: '总结附件',
+      },
+    })
+    const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [file],
+    })
+
+    await input.trigger('change')
+
+    expect(documentApi.uploadDocument).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('report.pdf')
+    expect(wrapper.text()).toContain('待发送')
+  })
+
+  it('emits the question and staged files together, then clears the composer', async () => {
+    const wrapper = mount(ChatInput, {
+      props: {
+        disabled: false,
+        isStreaming: false,
+        text: '总结附件',
+      },
+    })
+    const file = new File(['%PDF'], 'report.pdf', { type: 'application/pdf' })
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', {
+      configurable: true,
+      value: [file],
+    })
+    await input.trigger('change')
+
+    await wrapper.get('button[aria-label="发送"]').trigger('click')
+
+    expect(wrapper.emitted('send')?.[0]).toEqual(['总结附件', [file]])
+    const textUpdates = wrapper.emitted('update:text') ?? []
+    expect(textUpdates[textUpdates.length - 1]).toEqual([''])
+    expect(wrapper.text()).not.toContain('report.pdf')
   })
 })

@@ -1,17 +1,53 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import CitationCard from './CitationCard.vue'
+import MessageAttachment from './MessageAttachment.vue'
+import TurnRecoveryActions from './TurnRecoveryActions.vue'
 import type { MessageVO } from '@/types/chat'
 
-defineProps<{ message: MessageVO }>()
+const props = defineProps<{ message: MessageVO }>()
+
+const emit = defineEmits<{
+  retryAttachment: [turnId: string, attachmentId: string]
+  retryUpload: [turnId: string, attachmentId: string, file: File]
+  ignoreAttachment: [turnId: string, attachmentId: string]
+  addAttachments: [turnId: string, files: File[]]
+  cancelTurn: [turnId: string]
+}>()
+
+const showTurnRecovery = computed(() => (
+  props.message.processing_status === 'waiting_files'
+  && Boolean(props.message.attachments?.length)
+  && props.message.attachments!.every(attachment => (
+    attachment.status === 'failed' || attachment.status === 'ignored'
+  ))
+))
 </script>
 
 <template>
   <!-- 提问：桌板色的一小张卡，右对齐 -->
   <div v-if="message.role === 'user'" class="flex justify-end">
     <div class="max-w-[85%] rounded-lg bg-desk px-[14px] py-[10px] text-body text-graphite">
-      {{ message.content }}
+      <p>{{ message.content }}</p>
+      <div v-if="message.attachments?.length" class="mt-sm space-y-xs">
+        <MessageAttachment
+          v-for="attachment in message.attachments"
+          :key="attachment.attachment_id"
+          :attachment="attachment"
+          :actions-enabled="message.processing_status === 'waiting_files'"
+          @retry="emit('retryAttachment', props.message.id, $event)"
+          @retry-upload="(attachmentId, file) => emit('retryUpload', props.message.id, attachmentId, file)"
+          @ignore="emit('ignoreAttachment', props.message.id, $event)"
+        />
+      </div>
+      <TurnRecoveryActions
+        v-if="showTurnRecovery"
+        :turn-id="message.id"
+        @add-attachments="emit('addAttachments', props.message.id, $event)"
+        @cancel="emit('cancelTurn', props.message.id)"
+      />
     </div>
   </div>
 

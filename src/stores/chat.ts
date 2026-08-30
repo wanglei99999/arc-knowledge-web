@@ -3,12 +3,16 @@ import { defineStore } from 'pinia'
 import { message } from 'ant-design-vue'
 
 import {
+  addTurnAttachment,
+  cancelChatTurn,
   createChatTurn,
   createSession,
   deleteSession,
   getChatTurn,
+  ignoreTurnAttachment,
   listMessages,
   listSessions,
+  retryTurnAttachment,
   uploadTurnAttachment,
 } from '@/api/chat'
 import { useSpacesStore } from '@/stores/spaces'
@@ -637,6 +641,165 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function findTurnContext(turnId: string) {
+    const entry = Object.entries(turnsBySession.value)
+      .find(([, turn]) => turn?.turn_id === turnId)
+    if (!entry || !entry[1]) return null
+    return { sessionId: entry[0], turn: entry[1] }
+  }
+
+  async function retryAttachment(turnId: string, attachmentId: string) {
+    const context = findTurnContext(turnId)
+    const attachment = context?.turn.attachments
+      .find(item => item.attachment_id === attachmentId)
+    if (!context || !attachment || attachment.status !== 'failed') return
+
+    if (!attachment.document_id) {
+      message.error('上传失败的附件需要重新选择原文件')
+      return
+    }
+
+    patchTurnAttachment(context.sessionId, attachmentId, {
+      status: 'ingesting',
+      error_message: null,
+    })
+    try {
+      const updated = await retryTurnAttachment(turnId, attachmentId)
+      applyTurn(context.sessionId, updated)
+      continueTurn(context.sessionId, updated)
+    } catch {
+      patchTurnAttachment(context.sessionId, attachmentId, {
+        status: 'failed',
+        error_message: attachment.error_message || '入库重试失败，请稍后再试',
+      })
+      message.error('附件入库重试失败，请稍后再试')
+    }
+  }
+
+  async function retryUpload(turnId: string, attachmentId: string, file: File) {
+    const context = findTurnContext(turnId)
+    const attachment = context?.turn.attachments
+      .find(item => item.attachment_id === attachmentId)
+    if (!context
+      || !attachment
+      || attachment.status !== 'failed'
+      || attachment.document_id) return
+
+    patchTurnAttachment(context.sessionId, attachmentId, {
+      status: 'uploading',
+      progress: 0,
+      error_message: null,
+    })
+    try {
+      const updated = await uploadTurnAttachment(
+        turnId,
+        attachmentId,
+        file,
+        progress => patchTurnAttachment(
+          context.sessionId,
+          attachmentId,
+          { status: 'uploading', progress },
+        ),
+      )
+      applyTurn(context.sessionId, updated)
+      continueTurn(context.sessionId, updated)
+    } catch {
+      patchTurnAttachment(context.sessionId, attachmentId, {
+        status: 'failed',
+        progress: 0,
+        error_message: '文件上传失败，请重新选择原文件',
+      })
+      message.error('附件上传失败，请重新选择原文件')
+    }
+  }
+
+  async function ignoreAttachment(turnId: string, attachmentId: string) {
+    const context = findTurnContext(turnId)
+    const attachment = context?.turn.attachments
+      .find(item => item.attachment_id === attachmentId)
+    if (!context || !attachment || attachment.status !== 'failed') return
+
+    patchTurnAttachment(context.sessionId, attachmentId, {
+      status: 'ignored',
+      ignored: true,
+      error_message: null,
+    })
+    try {
+      const updated = await ignoreTurnAttachment(turnId, attachmentId)
+      applyTurn(context.sessionId, updated)
+      continueTurn(context.sessionId, updated)
+    } catch {
+      applyTurn(context.sessionId, context.turn)
+      message.error('忽略附件失败，请稍后再试')
+    }
+  }
+
+  async function addAttachments(turnId: string, files: File[]) {
+    const context = findTurnContext(turnId)
+    if (!context
+      || !files.length
+      || context.turn.processing_status !== 'waiting_files') return
+
+    let latest = context.turn
+    for (const file of files) {
+      const declaration: AttachmentDeclaration = {
+        client_id: crypto.randomUUID(),
+        file_name: file.name,
+        mime_type: file.type || 'application/octet-stream',
+        file_size: file.size,
+      }
+      let attachmentId: string | null = null
+      try {
+        const declared = await addTurnAttachment(turnId, declaration)
+        applyTurn(context.sessionId, declared)
+        const attachment = declared.attachments
+          .find(item => item.client_id === declaration.client_id)
+        if (!attachment) throw new Error('新增附件占位不存在')
+        attachmentId = attachment.attachment_id
+        patchTurnAttachment(context.sessionId, attachmentId, {
+          status: 'uploading',
+          progress: 0,
+        })
+        latest = await uploadTurnAttachment(
+          turnId,
+          attachmentId,
+          file,
+          progress => patchTurnAttachment(
+            context.sessionId,
+            attachmentId!,
+            { status: 'uploading', progress },
+          ),
+        )
+        applyTurn(context.sessionId, latest)
+      } catch {
+        if (attachmentId) {
+          patchTurnAttachment(context.sessionId, attachmentId, {
+            status: 'failed',
+            progress: 0,
+            error_message: '补充附件上传失败，请重新选择',
+          })
+        }
+        message.error(`补充附件 ${file.name} 失败`)
+      }
+    }
+    continueTurn(context.sessionId, latest)
+  }
+
+  async function cancelTurn(turnId: string) {
+    const context = findTurnContext(turnId)
+    if (!context || !['waiting_files', 'answer_failed'].includes(
+      context.turn.processing_status,
+    )) return
+
+    try {
+      const cancelled = await cancelChatTurn(turnId)
+      applyTurn(context.sessionId, cancelled)
+      continueTurn(context.sessionId, cancelled)
+    } catch {
+      message.error('取消本轮失败，请稍后再试')
+    }
+  }
+
   async function resumePendingTurns() {
     await Promise.all(Object.entries(pendingTurnsBySession.value).map(
       async ([sessionId, turnId]) => {
@@ -702,6 +865,11 @@ export const useChatStore = defineStore('chat', () => {
     removeSession,
     sendMessage,
     submitTurn,
+    retryAttachment,
+    retryUpload,
+    ignoreAttachment,
+    addAttachments,
+    cancelTurn,
     resumePendingTurns,
     stopGeneration,
     isSessionBusy,
