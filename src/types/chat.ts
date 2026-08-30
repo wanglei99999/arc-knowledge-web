@@ -28,6 +28,8 @@ export type TurnProcessingStatus =
   | 'answer_failed'
   | 'cancelled'
 
+export type SessionNotification = 'completed_unread' | 'failed_unread'
+
 export interface AttachmentVO {
   attachment_id: string
   client_id: string
