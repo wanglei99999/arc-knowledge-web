@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { h, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
 import { useSpacesStore } from '@/stores/spaces'
 import { useChatStore } from '@/stores/chat'
-import SessionNotificationDot from '@/components/layout/SessionNotificationDot.vue'
+import SessionRow from '@/components/layout/SessionRow.vue'
 import {
   LayoutDashboard,
   FileText,
@@ -16,7 +16,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-vue-next'
-import { Modal, message } from 'ant-design-vue'
+import { Modal, message, notification } from 'ant-design-vue'
 import { cn } from '@/lib/utils'
 
 const route = useRoute()
@@ -72,17 +72,33 @@ function confirmDeleteSpace(e: Event, spaceId: string, spaceName: string) {
   })
 }
 
-function confirmDeleteSession(e: Event, id: string, title: string) {
-  e.stopPropagation()
-  Modal.confirm({
-    title: '删除会话',
-    content: `删除「${title}」后不可恢复。`,
-    okText: '删除会话',
-    okType: 'danger',
-    cancelText: '取消',
-    async onOk() {
-      await chatStore.removeSession(id)
-    },
+async function archiveSession(id: string, title: string) {
+  try {
+    await chatStore.archiveSession(id)
+  } catch {
+    message.error('归档会话失败，请重试')
+    return
+  }
+
+  const key = `session-archive-${id}`
+  notification.open({
+    key,
+    message: '会话已归档',
+    description: `「${title}」已移到个人设置的归档聊天中。`,
+    duration: 6,
+    btn: () => h('button', {
+      type: 'button',
+      class: 'text-label text-accent-blue hover:underline',
+      async onClick() {
+        try {
+          await chatStore.restoreArchivedSession(id)
+          notification.close(key)
+          message.success('会话已恢复')
+        } catch {
+          message.error('恢复会话失败，请前往归档聊天重试')
+        }
+      },
+    }, '撤销'),
   })
 }
 
@@ -237,32 +253,16 @@ async function handleCreateSpace() {
                 <span class="shrink-0 font-callnum text-callnum-sm text-graphite-45">待发送</span>
               </div>
 
-              <div
+              <SessionRow
                 v-for="session in chatStore.sessions"
                 :key="session.id"
-                :class="cn(
-                  'group flex cursor-pointer items-center gap-sm rounded-sm px-sm py-[5px] text-meta',
-                  'transition-colors duration-hover ease-settle motion-reduce:transition-none',
-                  chatStore.activeSessionId === session.id && route.path.startsWith('/chat')
-                    ? 'bg-desk-sunken text-graphite'
-                    : 'text-graphite-45 hover:bg-desk-hover hover:text-graphite',
-                )"
-                @click="openSession(session.id)"
-              >
-                <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
-                <SessionNotificationDot
-                  v-if="chatStore.sessionNotification(session.id)"
-                  :status="chatStore.sessionNotification(session.id)!"
-                />
-                <button
-                  type="button"
-                  :aria-label="`删除会话 ${session.title}`"
-                  class="hidden shrink-0 rounded-xs p-[2px] text-graphite-45 hover:text-alert-ink group-hover:block"
-                  @click="confirmDeleteSession($event, session.id, session.title)"
-                >
-                  <Trash2 class="h-3 w-3" :stroke-width="1.5" />
-                </button>
-              </div>
+                :session="session"
+                :active="chatStore.activeSessionId === session.id && route.path.startsWith('/chat')"
+                :busy="chatStore.isSessionBusy(session.id)"
+                :notification="chatStore.sessionNotification(session.id)"
+                @open="openSession"
+                @archive="archiveSession(session.id, session.title)"
+              />
 
               <p
                 v-if="!chatStore.sessions.length && !chatStore.pendingNew"

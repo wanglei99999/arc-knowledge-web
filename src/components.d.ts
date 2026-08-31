@@ -32,6 +32,7 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     ScoreBar: typeof import('./components/ui/ScoreBar.vue')['default']
     SessionNotificationDot: typeof import('./components/layout/SessionNotificationDot.vue')['default']
+    SessionRow: typeof import('./components/layout/SessionRow.vue')['default']
     StatusBadge: typeof import('./components/document/StatusBadge.vue')['default']
     TurnRecoveryActions: typeof import('./components/chat/TurnRecoveryActions.vue')['default']
     UploadZone: typeof import('./components/document/UploadZone.vue')['default']
