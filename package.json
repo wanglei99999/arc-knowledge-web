@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vue-tsc && vite build",
     "test": "vitest run",
+    "test:e2e": "node scripts/run-e2e.mjs",
     "preview": "vite preview",
     "format": "prettier --write src/**/*.{vue,ts,tsx}",
     "shot": "node scripts/shot.mjs"

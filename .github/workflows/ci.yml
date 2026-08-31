@@ -23,8 +23,7 @@ jobs:
       run:
         working-directory: .
 
-    # 跳过 Playwright 的浏览器下载：构建用不到浏览器（那是截图/E2E 才要的），
-    # 不跳的话 npm ci 会顺带下 ~180MB，白白拖慢每次 CI
+    # npm ci 只装 JS 依赖；浏览器在测试步骤中显式安装，缓存和失败位置更清晰。
     env:
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
 
@@ -46,7 +45,16 @@ jobs:
       - name: 安装依赖
         run: npm ci
 
-      # 4. 真正的校验：类型检查 + 打包（build 脚本是 vue-tsc && vite build）。
-      #    任何一步非零退出，这个 job 就失败，提交上显示红叉
+      # 4. 先跑快速单元测试，再安装浏览器执行真实交互回归。
+      - name: 单元测试
+        run: npm test
+
+      - name: 安装 Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 端到端测试
+        run: npm run test:e2e
+
+      # 5. 最后执行类型检查 + 打包；任一步非零退出都会阻止合并。
       - name: 构建
         run: npm run build
