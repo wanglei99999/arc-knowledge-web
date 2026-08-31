@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { LogOut, ChevronDown, PanelLeftClose, PanelLeftOpen } from 'lucide-vue-next'
+import {
+  Archive,
+  LogOut,
+  ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
+} from 'lucide-vue-next'
 import { useAuthStore } from '@/stores/auth'
 import { useAppStore } from '@/stores/app'
 
@@ -16,6 +22,7 @@ const breadcrumbMap: Record<string, string> = {
   '/chat':      '智能问答',
   '/search':    '检索调试',
   '/admin':     '管理配置',
+  '/settings/archived-chats': '已归档聊天',
 }
 
 const currentTitle = computed(() => breadcrumbMap[route.path] ?? '')
@@ -51,6 +58,7 @@ async function handleLogout() {
       <div class="relative">
         <button
           type="button"
+          aria-label="用户菜单"
           class="flex h-8 items-center gap-sm rounded-sm px-sm text-label text-graphite-70 transition-colors duration-hover ease-settle hover:bg-desk-hover hover:text-graphite motion-reduce:transition-none"
           :aria-expanded="dropdownOpen"
           @click="dropdownOpen = !dropdownOpen"
@@ -74,6 +82,14 @@ async function handleLogout() {
             <p class="truncate px-sm py-xs font-callnum text-callnum-sm text-graphite-45">
               {{ authStore.email }}
             </p>
+            <RouterLink
+              to="/settings/archived-chats"
+              class="flex h-[30px] w-full items-center gap-sm rounded-sm px-sm text-body-sm text-graphite transition-colors duration-hover ease-settle hover:bg-desk-hover motion-reduce:transition-none"
+              @click="dropdownOpen = false"
+            >
+              <Archive class="h-4 w-4 shrink-0" :stroke-width="1.5" />
+              个人设置
+            </RouterLink>
             <button
               type="button"
               class="flex h-[30px] w-full items-center gap-sm rounded-sm px-sm text-body-sm text-graphite transition-colors duration-hover ease-settle hover:bg-desk-hover motion-reduce:transition-none"

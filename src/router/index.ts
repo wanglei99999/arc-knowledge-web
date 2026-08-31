@@ -47,6 +47,22 @@ const router = createRouter({
           name: 'admin',
           component: () => import('@/views/admin/index.vue'),
         },
+        {
+          path: 'settings',
+          component: () => import('@/views/settings/UserSettingsLayout.vue'),
+          children: [
+            {
+              path: '',
+              redirect: { name: 'archived-chats' },
+            },
+            {
+              path: 'archived-chats',
+              name: 'archived-chats',
+              component: () => import('@/views/settings/ArchivedChatsView.vue'),
+              meta: { requiresAuth: true },
+            },
+          ],
+        },
       ],
     },
   ],
