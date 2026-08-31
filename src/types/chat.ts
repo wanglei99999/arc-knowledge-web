@@ -45,6 +45,7 @@ export interface AttachmentVO {
 
 export interface MessageVO {
   id: string
+  turn_id?: string
   role: MessageRole
   content: string
   created_at: string

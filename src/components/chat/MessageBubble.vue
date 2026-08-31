@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { CircleAlert, RotateCcw } from 'lucide-vue-next'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/preview.css'
 import CitationCard from './CitationCard.vue'
@@ -15,6 +16,7 @@ const emit = defineEmits<{
   ignoreAttachment: [turnId: string, attachmentId: string]
   addAttachments: [turnId: string, files: File[]]
   cancelTurn: [turnId: string]
+  retryAnswer: [turnId: string]
 }>()
 
 const showTurnRecovery = computed(() => (
@@ -48,6 +50,25 @@ const showTurnRecovery = computed(() => (
         @add-attachments="emit('addAttachments', props.message.id, $event)"
         @cancel="emit('cancelTurn', props.message.id)"
       />
+      <div
+        v-if="message.processing_status === 'answer_failed'"
+        class="mt-sm rounded-md bg-alert-fill px-md py-sm text-alert-ink"
+        role="alert"
+      >
+        <div class="flex items-start gap-xs text-meta">
+          <CircleAlert class="mt-[1px] h-4 w-4 shrink-0" :stroke-width="1.5" />
+          <p>{{ message.processing_error || '回答生成失败，请稍后重试。' }}</p>
+        </div>
+        <button
+          type="button"
+          class="mt-sm inline-flex items-center gap-xs rounded-sm border border-alert-ink/20 px-sm py-xs text-label transition-colors duration-hover ease-settle hover:bg-paper/50"
+          aria-label="重新生成回答"
+          @click="emit('retryAnswer', props.message.id)"
+        >
+          <RotateCcw class="h-3.5 w-3.5" :stroke-width="1.5" />
+          重新生成回答
+        </button>
+      </div>
     </div>
   </div>
 

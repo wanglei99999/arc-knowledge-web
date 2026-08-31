@@ -641,4 +641,262 @@ describe('chat store multi-session runtime', () => {
     expect(store.messagesBySession['session-a'][0].processing_status).toBe('cancelled')
     expect(store.isSessionBusy('session-a')).toBe(false)
   })
+
+  it('writes an answer stream failure back to the original user turn', async () => {
+    const store = setupStore()
+    mockTurnIds()
+    const file = new File(['data'], 'report.pdf', { type: 'application/pdf' })
+    const readyTurn = turn({ readiness: 'ready' })
+    chatApi.createChatTurn.mockResolvedValue(turn())
+    chatApi.uploadTurnAttachment.mockResolvedValue(turn())
+    chatApi.getChatTurn.mockResolvedValue(readyTurn)
+    await store.switchSession('session-a')
+
+    await store.submitTurn('总结附件', [file])
+    streams.turn.get('turn-1')!.callbacks.onError(new Error('DeepSeek 暂时不可用'))
+
+    expect(store.messagesBySession['session-a'][0]).toMatchObject({
+      id: 'turn-1',
+      role: 'user',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+    })
+    expect(store.isSessionBusy('session-a')).toBe(false)
+  })
+
+  it('starts only one new answer stream when retry is requested repeatedly', async () => {
+    const store = setupStore()
+    const failedTurn = turn({
+      readiness: 'ready',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+      attachments: failedTurn.attachments,
+    }]
+
+    store.retryAnswer('turn-1')
+    store.retryAnswer('turn-1')
+
+    expect(streamApi.turn).toHaveBeenCalledTimes(1)
+    expect(store.messagesBySession['session-a'][0]).toMatchObject({
+      processing_status: 'answering',
+      processing_error: null,
+    })
+    expect(store.isSessionBusy('session-a')).toBe(true)
+
+    streams.turn.get('turn-1')!.callbacks.onDone('重试后的回答', [])
+
+    expect(store.messagesBySession['session-a'][0].processing_status).toBe('completed')
+    expect(store.messagesBySession['session-a'].slice(-1)[0]).toMatchObject({
+      role: 'assistant',
+      content: '重试后的回答',
+      streaming: false,
+    })
+    expect(store.isSessionBusy('session-a')).toBe(false)
+  })
+
+  it('retries a historical failed turn after messages reload without a turn cache', async () => {
+    const store = setupStore()
+    const failedTurn = turn({
+      readiness: 'ready',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+    })
+    chatApi.listMessages.mockResolvedValue([{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+      attachments: failedTurn.attachments,
+    }])
+    chatApi.getChatTurn.mockResolvedValue(failedTurn)
+    await store.switchSession('session-a')
+
+    await store.retryAnswer('turn-1')
+
+    expect(store.messagesBySession['session-a'][0]).toMatchObject({
+      id: 'turn-1',
+      processing_status: 'answering',
+      processing_error: null,
+    })
+    expect(streamApi.turn).toHaveBeenCalledTimes(1)
+    expect(chatApi.createChatTurn).not.toHaveBeenCalled()
+    expect(chatApi.uploadTurnAttachment).not.toHaveBeenCalled()
+  })
+
+  it('coalesces repeated historical retries before turn hydration completes', async () => {
+    const store = setupStore()
+    const failedTurn = turn({
+      readiness: 'ready',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+    })
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+      attachments: failedTurn.attachments,
+    }]
+    let resolveFirst!: (value: ChatTurnVO) => void
+    let resolveSecond!: (value: ChatTurnVO) => void
+    chatApi.getChatTurn
+      .mockReturnValueOnce(new Promise(resolve => { resolveFirst = resolve }))
+      .mockReturnValueOnce(new Promise(resolve => { resolveSecond = resolve }))
+
+    const firstRetry = store.retryAnswer('turn-1')
+    const secondRetry = store.retryAnswer('turn-1')
+    resolveFirst(failedTurn)
+    await firstRetry
+    streams.turn.get('turn-1')!.callbacks.onDone('第一次重试已完成', [])
+    resolveSecond(failedTurn)
+    await secondRetry
+
+    expect(chatApi.getChatTurn).toHaveBeenCalledTimes(1)
+    expect(streamApi.turn).toHaveBeenCalledTimes(1)
+    expect(store.messagesBySession['session-a'][0].processing_status).toBe('completed')
+  })
+
+  it('removes only the failed assistant placeholder belonging to the retried turn', async () => {
+    const store = setupStore()
+    const failedTurn = turn({
+      readiness: 'ready',
+      processing_status: 'answer_failed',
+      processing_error: '目标回答失败',
+    })
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'assistant-older',
+      role: 'assistant',
+      content: '更早一轮回答失败',
+      created_at: '2026-08-30T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      turn_id: 'turn-older',
+    }, {
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: '目标回答失败',
+      attachments: failedTurn.attachments,
+    }, {
+      id: 'assistant-target',
+      role: 'assistant',
+      content: '目标回答失败',
+      created_at: '2026-08-31T00:00:01.000Z',
+      processing_status: 'answer_failed',
+      turn_id: 'turn-1',
+    }]
+
+    await store.retryAnswer('turn-1')
+
+    expect(store.messagesBySession['session-a'].some(
+      message => message.id === 'assistant-older',
+    )).toBe(true)
+    expect(store.messagesBySession['session-a'].some(
+      message => message.id === 'assistant-target',
+    )).toBe(false)
+  })
+
+  it('keeps the failed placeholder when another stream owns the session runtime', async () => {
+    const store = setupStore()
+    const failedTurn = turn({
+      readiness: 'ready',
+      processing_status: 'answer_failed',
+      processing_error: '目标回答失败',
+    })
+    await store.switchSession('session-a')
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: '目标回答失败',
+      attachments: failedTurn.attachments,
+    }, {
+      id: 'assistant-target',
+      role: 'assistant',
+      content: '目标回答失败',
+      created_at: '2026-08-31T00:00:01.000Z',
+      processing_status: 'answer_failed',
+      turn_id: 'turn-1',
+    }]
+    await store.sendMessage('正在处理的另一个问题')
+
+    await store.retryAnswer('turn-1')
+
+    expect(store.messagesBySession['session-a'].some(
+      message => message.id === 'assistant-target',
+    )).toBe(true)
+    expect(streamApi.turn).not.toHaveBeenCalled()
+  })
+
+  it('does not retry an old answer while a new attachment turn is being submitted', async () => {
+    const store = setupStore()
+    mockTurnIds()
+    const failedTurn = turn({
+      readiness: 'ready',
+      processing_status: 'answer_failed',
+      processing_error: '目标回答失败',
+    })
+    await store.switchSession('session-a')
+    store.turnsBySession['session-a'] = failedTurn
+    store.messagesBySession['session-a'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: '目标回答失败',
+      attachments: failedTurn.attachments,
+    }, {
+      id: 'assistant-target',
+      role: 'assistant',
+      content: '目标回答失败',
+      created_at: '2026-08-31T00:00:01.000Z',
+      processing_status: 'answer_failed',
+      turn_id: 'turn-1',
+    }]
+    const newTurn = turn({
+      turn_id: 'turn-2',
+      query: '新的附件问题',
+    })
+    let resolveCreate!: (value: ChatTurnVO) => void
+    chatApi.createChatTurn.mockReturnValue(new Promise(resolve => {
+      resolveCreate = resolve
+    }))
+    chatApi.uploadTurnAttachment.mockResolvedValue(newTurn)
+    chatApi.getChatTurn.mockResolvedValue(newTurn)
+    const file = new File(['data'], 'new.pdf', { type: 'application/pdf' })
+
+    const submission = store.submitTurn('新的附件问题', [file])
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(store.sessionBusy).toBe(true)
+
+    await store.retryAnswer('turn-1')
+
+    expect(streamApi.turn).not.toHaveBeenCalled()
+    expect(store.messagesBySession['session-a'].some(
+      message => message.id === 'assistant-target',
+    )).toBe(true)
+
+    resolveCreate(newTurn)
+    await submission
+  })
 })
