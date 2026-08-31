@@ -22,3 +22,6 @@ Thumbs.db
 # Vite / TypeScript cache
 *.local
 *.tsbuildinfo
+
+# Local Superpowers brainstorming sessions
+.superpowers/
