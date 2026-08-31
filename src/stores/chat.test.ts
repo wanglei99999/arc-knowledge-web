@@ -10,6 +10,8 @@ const chatApi = vi.hoisted(() => ({
   listSessions: vi.fn(),
   createSession: vi.fn(),
   deleteSession: vi.fn(),
+  archiveSession: vi.fn(),
+  restoreSession: vi.fn(),
   listMessages: vi.fn(),
   createChatTurn: vi.fn(),
   getChatTurn: vi.fn(),
@@ -121,6 +123,61 @@ describe('chat store multi-session runtime', () => {
     })
     chatApi.listMessages.mockResolvedValue([])
     chatApi.listSessions.mockResolvedValue([session('session-a'), session('session-b')])
+  })
+
+  it('archives the active session and opens a new-session state', async () => {
+    const store = setupStore()
+    await store.switchSession('session-a')
+
+    await store.archiveSession('session-a')
+
+    expect(chatApi.archiveSession).toHaveBeenCalledWith('session-a')
+    expect(store.sessions.map(item => item.id)).toEqual(['session-b'])
+    expect(store.activeSessionId).toBeNull()
+    expect(store.pendingNew).toBe(true)
+  })
+
+  it('keeps a session visible when archive fails', async () => {
+    const store = setupStore()
+    chatApi.archiveSession.mockRejectedValue(new Error('network'))
+
+    await expect(store.archiveSession('session-a')).rejects.toThrow('network')
+
+    expect(store.sessions.map(item => item.id)).toEqual([
+      'session-a',
+      'session-b',
+    ])
+  })
+
+  it('rejects archive locally while the session is busy', async () => {
+    const store = setupStore()
+    await store.switchSession('session-a')
+    await store.sendMessage('正在回答')
+
+    await expect(store.archiveSession('session-a')).rejects.toThrow(
+      'SESSION_BUSY',
+    )
+
+    expect(chatApi.archiveSession).not.toHaveBeenCalled()
+    expect(store.sessions.map(item => item.id)).toContain('session-a')
+  })
+
+  it('restores an archived session and refreshes the current space', async () => {
+    const store = setupStore()
+    store.sessions = [session('session-b')]
+    chatApi.listSessions.mockResolvedValue([
+      session('session-a'),
+      session('session-b'),
+    ])
+
+    await store.restoreArchivedSession('session-a')
+
+    expect(chatApi.restoreSession).toHaveBeenCalledWith('session-a')
+    expect(chatApi.listSessions).toHaveBeenCalledWith('space-1')
+    expect(store.sessions.map(item => item.id)).toEqual([
+      'session-a',
+      'session-b',
+    ])
   })
 
   it('keeps session A streaming after the user switches to session B', async () => {

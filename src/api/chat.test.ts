@@ -193,4 +193,67 @@ describe('chat turn API', () => {
       attachments: [attachment],
     })
   })
+
+  it('maps archived sessions with their original space summary', async () => {
+    http.get.mockResolvedValue({
+      items: [{
+        session_id: 'session-1',
+        title: '旧版上传流程',
+        message_count: 2,
+        archived_at: '2026-08-21T09:30:00Z',
+        space: {
+          space_id: 'space-1',
+          name: '产品文档',
+          status: 'active',
+        },
+      }],
+      total: 1,
+    })
+
+    const page = await api().listArchivedSessions({
+      query: '上传',
+      space_id: 'space-1',
+      limit: 50,
+      offset: 0,
+    })
+
+    expect(http.get).toHaveBeenCalledWith('/sessions/archived', {
+      params: {
+        query: '上传',
+        space_id: 'space-1',
+        limit: 50,
+        offset: 0,
+      },
+    })
+    expect(page).toEqual({
+      items: [{
+        id: 'session-1',
+        title: '旧版上传流程',
+        message_count: 2,
+        archived_at: '2026-08-21T09:30:00Z',
+        space: {
+          space_id: 'space-1',
+          name: '产品文档',
+          status: 'active',
+        },
+      }],
+      total: 1,
+    })
+  })
+
+  it('uses session lifecycle action routes for archive and restore', async () => {
+    http.post.mockResolvedValue(undefined)
+
+    await api().archiveSession('session-1')
+    await api().restoreSession('session-1')
+
+    expect(http.post).toHaveBeenNthCalledWith(
+      1,
+      '/sessions/session-1/archive',
+    )
+    expect(http.post).toHaveBeenNthCalledWith(
+      2,
+      '/sessions/session-1/restore',
+    )
+  })
 })

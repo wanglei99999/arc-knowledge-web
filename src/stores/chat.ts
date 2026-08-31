@@ -4,6 +4,7 @@ import { message } from 'ant-design-vue'
 
 import {
   addTurnAttachment,
+  archiveSession as apiArchiveSession,
   cancelChatTurn,
   createChatTurn,
   createSession,
@@ -13,6 +14,7 @@ import {
   listMessages,
   listSessions,
   retryTurnAttachment,
+  restoreSession as apiRestoreSession,
   uploadTurnAttachment,
 } from '@/api/chat'
 import { useSpacesStore } from '@/stores/spaces'
@@ -458,6 +460,28 @@ export const useChatStore = defineStore('chat', () => {
         activeSessionId.value = null
       }
     }
+  }
+
+  async function archiveSession(id: string) {
+    if (isSessionBusy(id)) throw new Error('SESSION_BUSY')
+
+    await apiArchiveSession(id)
+    runtimeBySession.delete(id)
+    delete messagesBySession.value[id]
+    delete draftsBySession.value[id]
+    delete notificationsBySession.value[id]
+    delete pendingTurnsBySession.value[id]
+    delete streamingBySession.value[id]
+    delete submittingBySession.value[id]
+    persistRuntime()
+    sessions.value = sessions.value.filter(session => session.id !== id)
+
+    if (activeSessionId.value === id) newSession()
+  }
+
+  async function restoreArchivedSession(id: string) {
+    await apiRestoreSession(id)
+    if (spacesStore.currentSpace) await fetchSessions()
   }
 
   async function ensureActiveSession(): Promise<string | null> {
@@ -911,6 +935,8 @@ export const useChatStore = defineStore('chat', () => {
     switchSession,
     newSession,
     removeSession,
+    archiveSession,
+    restoreArchivedSession,
     sendMessage,
     submitTurn,
     retryAnswer,

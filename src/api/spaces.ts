@@ -9,3 +9,6 @@ export const createSpace = (name: string) =>
 
 export const deleteSpace = (space_id: string) =>
     http.delete(`/spaces/${space_id}`)
+
+export const restoreSpace = (spaceId: string) =>
+    http.post<void>(`/spaces/${spaceId}/restore`)
