@@ -3,6 +3,8 @@ import type {
   AttachmentDeclaration,
   AttachmentStatus,
   AttachmentVO,
+  ArchivedSessionListParams,
+  ArchivedSessionPageVO,
   ChatTurnVO,
   Citation,
   CreateChatTurnPayload,
@@ -17,6 +19,23 @@ interface SessionOut {
   title: string | null
   summary: string | null
   message_count: number
+}
+
+interface ArchivedSessionOut {
+  session_id: string
+  title: string | null
+  message_count: number
+  archived_at: string
+  space: {
+    space_id: string
+    name: string
+    status: 'active' | 'archived'
+  }
+}
+
+interface ArchivedSessionPageOut {
+  items: ArchivedSessionOut[]
+  total: number
 }
 
 interface CitationOut {
@@ -146,6 +165,32 @@ export async function createSession(
 
 export async function deleteSession(id: string): Promise<void> {
   await http.delete(`/sessions/${id}`)
+}
+
+export async function archiveSession(id: string): Promise<void> {
+  await http.post<void>(`/sessions/${id}/archive`)
+}
+
+export async function restoreSession(id: string): Promise<void> {
+  await http.post<void>(`/sessions/${id}/restore`)
+}
+
+export async function listArchivedSessions(
+  params: ArchivedSessionListParams,
+): Promise<ArchivedSessionPageVO> {
+  const data = await http.get<ArchivedSessionPageOut>('/sessions/archived', {
+    params,
+  })
+  return {
+    items: data.items.map(item => ({
+      id: item.session_id,
+      title: item.title ?? '新会话',
+      message_count: item.message_count,
+      archived_at: item.archived_at,
+      space: item.space,
+    })),
+    total: data.total,
+  }
 }
 
 export async function listMessages(sessionId: string): Promise<MessageVO[]> {

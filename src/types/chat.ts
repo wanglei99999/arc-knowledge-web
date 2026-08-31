@@ -87,3 +87,27 @@ export interface SessionVO {
   updated_at: string
   message_count: number
 }
+
+export interface ArchivedSessionVO {
+  id: string
+  title: string
+  message_count: number
+  archived_at: string
+  space: {
+    space_id: string
+    name: string
+    status: 'active' | 'archived'
+  }
+}
+
+export interface ArchivedSessionPageVO {
+  items: ArchivedSessionVO[]
+  total: number
+}
+
+export interface ArchivedSessionListParams {
+  query?: string
+  space_id?: string
+  limit: number
+  offset: number
+}
