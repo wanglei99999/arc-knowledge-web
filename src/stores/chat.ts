@@ -110,6 +110,7 @@ export const useChatStore = defineStore('chat', () => {
 
   // AbortController、定时器和 File 都不属于界面状态，不能进入 Pinia/localStorage。
   const runtimeBySession = new Map<string, SessionRuntime>()
+  const retryHydrationInFlight = new Set<string>()
 
   const activeStateKey = computed(() => activeSessionId.value ?? NEW_SESSION_KEY)
   const messages = computed(() => messagesBySession.value[activeStateKey.value] ?? [])
@@ -328,19 +329,24 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function startTurnAnswer(sessionId: string, currentTurn: ChatTurnVO) {
+  function startTurnAnswer(
+    sessionId: string,
+    currentTurn: ChatTurnVO,
+  ): boolean {
     const runtime = runtimeOf(sessionId)
-    if (runtime.answerRequested || runtime.stopStream) return
+    if (runtime.answerRequested || runtime.stopStream) return false
     runtime.answerRequested = true
     clearPoll(runtime)
 
     const answeringTurn: ChatTurnVO = {
       ...currentTurn,
       processing_status: 'answering',
+      processing_error: null,
     }
     applyTurn(sessionId, answeringTurn)
     const assistantMessage: MessageVO = {
       id: localMessageId('assistant'),
+      turn_id: currentTurn.turn_id,
       role: 'assistant',
       content: '',
       created_at: new Date().toISOString(),
@@ -363,12 +369,7 @@ export const useChatStore = defineStore('chat', () => {
         }
       },
       onDone(fullText, citations) {
-        patchMessage(sessionId, assistantMessage.id, {
-          content: fullText,
-          citations,
-          streaming: false,
-        })
-        turnsBySession.value[sessionId] = {
+        applyTurn(sessionId, {
           ...answeringTurn,
           processing_status: 'completed',
           assistant: {
@@ -377,7 +378,7 @@ export const useChatStore = defineStore('chat', () => {
             citations,
             streaming: false,
           },
-        }
+        })
         finishTurnRuntime(sessionId)
         clearPendingTurn(sessionId)
         markSessionNotification(sessionId, 'completed_unread')
@@ -386,17 +387,20 @@ export const useChatStore = defineStore('chat', () => {
         patchMessage(sessionId, assistantMessage.id, {
           content: '抱歉，回答生成失败，请重试。',
           streaming: false,
+          processing_status: 'answer_failed',
+          processing_error: error.message,
         })
-        turnsBySession.value[sessionId] = {
+        applyTurn(sessionId, {
           ...answeringTurn,
           processing_status: 'answer_failed',
           processing_error: error.message,
-        }
+        })
         finishTurnRuntime(sessionId)
         markSessionNotification(sessionId, 'failed_unread')
         message.error(`生成失败：${error.message}`)
       },
     })
+    return true
   }
 
   async function fetchSessions() {
@@ -648,6 +652,50 @@ export const useChatStore = defineStore('chat', () => {
     return { sessionId: entry[0], turn: entry[1] }
   }
 
+  function findMessageSessionId(messageId: string): string | null {
+    const entry = Object.entries(messagesBySession.value)
+      .find(([, messages]) => messages.some(message => message.id === messageId))
+    return entry?.[0] ?? null
+  }
+
+  async function retryAnswer(turnId: string) {
+    let context = findTurnContext(turnId)
+    if (!context) {
+      const sessionId = findMessageSessionId(turnId)
+      if (!sessionId
+        || isSessionBusy(sessionId)
+        || retryHydrationInFlight.has(turnId)) return
+      retryHydrationInFlight.add(turnId)
+      try {
+        const turn = await getChatTurn(turnId)
+        if (turn.session_id !== sessionId || isSessionBusy(sessionId)) return
+        applyTurn(sessionId, turn)
+        context = { sessionId, turn }
+      } catch {
+        message.error('读取本轮状态失败，请稍后再试')
+        return
+      } finally {
+        retryHydrationInFlight.delete(turnId)
+      }
+    }
+
+    if (!context
+      || context.turn.processing_status !== 'answer_failed'
+      || context.turn.readiness !== 'ready') return
+    if (isSessionBusy(context.sessionId)) return
+
+    const started = startTurnAnswer(context.sessionId, context.turn)
+    if (!started) return
+    setSessionMessages(
+      context.sessionId,
+      (messagesBySession.value[context.sessionId] ?? []).filter(message => !(
+        message.role === 'assistant'
+        && message.processing_status === 'answer_failed'
+        && message.turn_id === turnId
+      )),
+    )
+  }
+
   async function retryAttachment(turnId: string, attachmentId: string) {
     const context = findTurnContext(turnId)
     const attachment = context?.turn.attachments
@@ -865,6 +913,7 @@ export const useChatStore = defineStore('chat', () => {
     removeSession,
     sendMessage,
     submitTurn,
+    retryAnswer,
     retryAttachment,
     retryUpload,
     ignoreAttachment,

@@ -141,4 +141,19 @@ describe('MessageBubble attachments', () => {
     expect(wrapper.find('button[aria-label="取消本轮"]').exists()).toBe(false)
   })
 
+  it('offers regenerating the answer after answer generation fails', async () => {
+    const message = userMessage(attachment({
+      document_id: 'document-1',
+      status: 'indexed',
+    }))
+    message.processing_status = 'answer_failed'
+    message.processing_error = 'DeepSeek 暂时不可用'
+    const wrapper = mount(MessageBubble, { props: { message } })
+
+    expect(wrapper.text()).toContain('DeepSeek 暂时不可用')
+    await wrapper.get('button[aria-label="重新生成回答"]').trigger('click')
+
+    expect(wrapper.emitted('retryAnswer')?.[0]).toEqual(['turn-1'])
+  })
+
 })

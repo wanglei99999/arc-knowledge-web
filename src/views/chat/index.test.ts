@@ -118,4 +118,24 @@ describe('chat view send routing', () => {
     expect(add).toHaveBeenCalledWith('turn-1', [file])
     expect(cancel).toHaveBeenCalledWith('turn-1')
   })
+
+  it('forwards answer regeneration from a failed turn to the store', async () => {
+    const store = useChatStore()
+    store.activeSessionId = 'session-1'
+    store.messagesBySession['session-1'] = [{
+      id: 'turn-1',
+      role: 'user',
+      content: '总结附件',
+      created_at: '2026-08-31T00:00:00.000Z',
+      processing_status: 'answer_failed',
+      processing_error: 'DeepSeek 暂时不可用',
+    }]
+    const retryAnswer = vi.spyOn(store, 'retryAnswer').mockResolvedValue()
+    const wrapper = mount(ChatView)
+
+    wrapper.getComponent(MessageBubble).vm.$emit('retryAnswer', 'turn-1')
+    await nextTick()
+
+    expect(retryAnswer).toHaveBeenCalledWith('turn-1')
+  })
 })

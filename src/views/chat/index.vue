@@ -116,6 +116,7 @@ onMounted(() => scrollToBottom(false))
           @ignore-attachment="store.ignoreAttachment"
           @add-attachments="store.addAttachments"
           @cancel-turn="store.cancelTurn"
+          @retry-answer="store.retryAnswer"
         />
       </div>
     </div>
