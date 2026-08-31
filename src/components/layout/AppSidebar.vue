@@ -295,7 +295,7 @@ async function handleCreateSpace() {
         )"
       >
         <Settings class="h-4 w-4 shrink-0" :stroke-width="1.5" />
-        <span v-if="!appStore.sidebarCollapsed" class="truncate">设置</span>
+        <span v-if="!appStore.sidebarCollapsed" class="truncate">管理配置</span>
       </RouterLink>
     </div>
   </aside>
