@@ -94,4 +94,122 @@ describe('SessionRow', () => {
 
     expect(wrapper.emitted('pin')).toEqual([['session-1']])
   })
+
+  it('starts inline editing from the direct rename action', async () => {
+    const wrapper = mount(SessionRow, {
+      attachTo: document.body,
+      props: { session, active: false, busy: false },
+    })
+
+    await wrapper
+      .get('.session-direct-action[aria-label="重命名会话 接入鉴权方案"]')
+      .trigger('click')
+
+    const input = wrapper.get('[aria-label="会话标题"]')
+    expect((input.element as HTMLInputElement).value).toBe('接入鉴权方案')
+    expect(document.activeElement).toBe(input.element)
+    wrapper.unmount()
+  })
+
+  it('opens the shared action menu on right click and can start renaming', async () => {
+    const wrapper = mount(SessionRow, {
+      attachTo: document.body,
+      props: { session, active: false, busy: false },
+    })
+
+    await wrapper.get('.session-row').trigger('contextmenu')
+    const menu = wrapper.get('[role="group"][aria-label="会话操作"]')
+    await menu
+      .get('[aria-label="重命名会话 接入鉴权方案"]')
+      .trigger('click')
+
+    expect(wrapper.find('[role="group"][aria-label="会话操作"]').exists()).toBe(false)
+    expect(wrapper.find('[aria-label="会话标题"]').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('submits a trimmed title with Enter and exits after success', async () => {
+    const wrapper = mount(SessionRow, {
+      attachTo: document.body,
+      props: { session, active: false, busy: false },
+    })
+    await wrapper
+      .get('.session-direct-action[aria-label^="重命名会话"]')
+      .trigger('click')
+    const input = wrapper.get('[aria-label="会话标题"]')
+    await input.setValue('  新的标题  ')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    const emitted = wrapper.emitted('rename')
+    expect(emitted?.[0]?.slice(0, 2)).toEqual(['session-1', '新的标题'])
+    const complete = emitted?.[0]?.[2] as (saved: boolean) => void
+    await wrapper.setProps({ session: { ...session, title: '新的标题' } })
+    complete(true)
+    await wrapper.vm.$nextTick()
+
+    expect(wrapper.find('[aria-label="会话标题"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      wrapper.get('[aria-label="打开会话 新的标题"]').element,
+    )
+    wrapper.unmount()
+  })
+
+  it('auto-saves a changed title on blur', async () => {
+    const wrapper = mount(SessionRow, {
+      props: { session, active: false, busy: false },
+    })
+    await wrapper
+      .get('.session-direct-action[aria-label^="重命名会话"]')
+      .trigger('click')
+    const input = wrapper.get('[aria-label="会话标题"]')
+    await input.setValue('失焦保存')
+    await input.trigger('blur')
+
+    expect(wrapper.emitted('rename')?.[0]?.slice(0, 2)).toEqual([
+      'session-1',
+      '失焦保存',
+    ])
+  })
+
+  it('keeps the draft and shows an error when saving fails', async () => {
+    const wrapper = mount(SessionRow, {
+      props: { session, active: false, busy: false },
+    })
+    await wrapper
+      .get('.session-direct-action[aria-label^="重命名会话"]')
+      .trigger('click')
+    const input = wrapper.get('[aria-label="会话标题"]')
+    await input.setValue('保留这个标题')
+    await input.trigger('keydown', { key: 'Enter' })
+    const complete = wrapper.emitted('rename')?.[0]?.[2] as (saved: boolean) => void
+    complete(false)
+    await wrapper.vm.$nextTick()
+
+    expect((wrapper.get('[aria-label="会话标题"]').element as HTMLInputElement).value)
+      .toBe('保留这个标题')
+    expect(wrapper.get('[role="alert"]').text()).toContain('保存失败')
+  })
+
+  it('rejects an empty title and cancels editing with Escape', async () => {
+    const wrapper = mount(SessionRow, {
+      attachTo: document.body,
+      props: { session, active: false, busy: false },
+    })
+    await wrapper
+      .get('.session-direct-action[aria-label^="重命名会话"]')
+      .trigger('click')
+    const input = wrapper.get('[aria-label="会话标题"]')
+    await input.setValue('   ')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    expect(wrapper.emitted('rename')).toBeUndefined()
+    expect(wrapper.get('[role="alert"]').text()).toContain('不能为空')
+
+    await input.trigger('keydown', { key: 'Escape' })
+    expect(wrapper.find('[aria-label="会话标题"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(
+      wrapper.get('[aria-label="打开会话 接入鉴权方案"]').element,
+    )
+    wrapper.unmount()
+  })
 })

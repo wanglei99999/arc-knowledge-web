@@ -15,6 +15,7 @@ const chatApi = vi.hoisted(() => ({
   restoreSession: vi.fn().mockResolvedValue(undefined),
   pinSession: vi.fn().mockResolvedValue(undefined),
   unpinSession: vi.fn().mockResolvedValue(undefined),
+  renameSession: vi.fn().mockResolvedValue(undefined),
   listMessages: vi.fn().mockResolvedValue([]),
   createChatTurn: vi.fn(),
   getChatTurn: vi.fn(),
@@ -97,6 +98,7 @@ describe('AppSidebar session notifications', () => {
     chatApi.restoreSession.mockResolvedValue(undefined)
     chatApi.pinSession.mockResolvedValue(undefined)
     chatApi.unpinSession.mockResolvedValue(undefined)
+    chatApi.renameSession.mockResolvedValue(undefined)
   })
 
   it('renders completed and failed unread results with different accessible dots', () => {
@@ -147,5 +149,29 @@ describe('AppSidebar session notifications', () => {
     await Promise.resolve()
 
     expect(chatApi.pinSession).toHaveBeenCalledWith('session-complete')
+  })
+
+  it('persists an inline rename and renders the new title', async () => {
+    const chatStore = setupSessions()
+    chatApi.renameSession.mockResolvedValue({
+      ...chatStore.sessions[0],
+      title: '新的会话标题',
+    })
+    const wrapper = mountSidebar()
+
+    await wrapper
+      .get('.session-direct-action[aria-label="重命名会话 已完成会话"]')
+      .trigger('click')
+    const input = wrapper.get('[aria-label="会话标题"]')
+    await input.setValue('新的会话标题')
+    await input.trigger('keydown', { key: 'Enter' })
+
+    await vi.waitFor(() => {
+      expect(chatApi.renameSession).toHaveBeenCalledWith(
+        'session-complete',
+        '新的会话标题',
+      )
+      expect(wrapper.text()).toContain('新的会话标题')
+    })
   })
 })

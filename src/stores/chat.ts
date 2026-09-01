@@ -15,6 +15,7 @@ import {
   listMessages,
   listSessions,
   pinSession as apiPinSession,
+  renameSession as apiRenameSession,
   retryTurnAttachment,
   restoreSession as apiRestoreSession,
   unpinSession as apiUnpinSession,
@@ -131,6 +132,7 @@ export const useChatStore = defineStore('chat', () => {
 
   // AbortController、定时器和 File 都不属于界面状态，不能进入 Pinia/localStorage。
   const runtimeBySession = new Map<string, SessionRuntime>()
+  const titleRevisionBySession = new Map<string, number>()
   const retryHydrationInFlight = new Set<string>()
 
   const activeStateKey = computed(() => activeSessionId.value ?? NEW_SESSION_KEY)
@@ -465,6 +467,7 @@ export const useChatStore = defineStore('chat', () => {
     await deleteSession(id)
     runtimeBySession.get(id)?.stopStream?.()
     runtimeBySession.delete(id)
+    titleRevisionBySession.delete(id)
     delete messagesBySession.value[id]
     delete draftsBySession.value[id]
     delete notificationsBySession.value[id]
@@ -488,6 +491,7 @@ export const useChatStore = defineStore('chat', () => {
 
     await apiArchiveSession(id)
     runtimeBySession.delete(id)
+    titleRevisionBySession.delete(id)
     delete messagesBySession.value[id]
     delete draftsBySession.value[id]
     delete notificationsBySession.value[id]
@@ -508,20 +512,29 @@ export const useChatStore = defineStore('chat', () => {
     )))
   }
 
-  function applyActivityMetadata(latest: SessionVO) {
+  function applyActivityMetadata(latest: SessionVO, preserveTitle = false) {
     const current = sessions.value.find(item => item.id === latest.id)
     if (!current
       || Date.parse(latest.updated_at) < Date.parse(current.updated_at)) return
     sessions.value = sortSessions(sessions.value.map(item => (
       item.id === latest.id
-        ? { ...latest, pinned_at: item.pinned_at }
+        ? {
+            ...latest,
+            title: preserveTitle ? item.title : latest.title,
+            pinned_at: item.pinned_at,
+          }
         : item
     )))
   }
 
   async function syncSessionFromServer(sessionId: string) {
+    const titleRevision = titleRevisionBySession.get(sessionId) ?? 0
     try {
-      applyActivityMetadata(await apiGetSession(sessionId))
+      const latest = await apiGetSession(sessionId)
+      applyActivityMetadata(
+        latest,
+        (titleRevisionBySession.get(sessionId) ?? 0) !== titleRevision,
+      )
     } catch {
       // 消息本身已经成功；排序元数据会在下次列表刷新时重新同步。
     }
@@ -535,6 +548,19 @@ export const useChatStore = defineStore('chat', () => {
       ? await apiUnpinSession(id)
       : await apiPinSession(id)
     applyPinState(latest)
+  }
+
+  async function renameSession(id: string, title: string) {
+    const latest = await apiRenameSession(id, title)
+    titleRevisionBySession.set(
+      id,
+      (titleRevisionBySession.get(id) ?? 0) + 1,
+    )
+    sessions.value = sessions.value.map(item => (
+      item.id === latest.id
+        ? { ...item, title: latest.title }
+        : item
+    ))
   }
 
   async function restoreArchivedSession(id: string) {
@@ -612,7 +638,7 @@ export const useChatStore = defineStore('chat', () => {
 
         const session = sessions.value.find(item => item.id === sessionId)
         if (session) {
-          if (session.message_count === 0) {
+          if (session.message_count === 0 && session.title === '新会话') {
             session.title = question.slice(0, 24) + (question.length > 24 ? '…' : '')
           }
           session.message_count += 2
@@ -996,6 +1022,7 @@ export const useChatStore = defineStore('chat', () => {
     removeSession,
     archiveSession,
     togglePinSession,
+    renameSession,
     restoreArchivedSession,
     sendMessage,
     submitTurn,
