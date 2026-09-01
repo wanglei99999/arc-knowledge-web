@@ -102,6 +102,14 @@ async function archiveSession(id: string, title: string) {
   })
 }
 
+async function togglePinSession(id: string) {
+  try {
+    await chatStore.togglePinSession(id)
+  } catch {
+    message.error('更新会话置顶状态失败，请重试')
+  }
+}
+
 async function handleCreateSpace() {
   const name = newSpaceName.value.trim()
   if (!name || creating.value) return
@@ -261,6 +269,7 @@ async function handleCreateSpace() {
                 :busy="chatStore.isSessionBusy(session.id)"
                 :notification="chatStore.sessionNotification(session.id)"
                 @open="openSession"
+                @pin="togglePinSession"
                 @archive="archiveSession(session.id, session.title)"
               />
 

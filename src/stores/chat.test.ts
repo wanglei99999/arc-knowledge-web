@@ -9,9 +9,12 @@ import type { StreamCallbacks } from '@/utils/sse'
 const chatApi = vi.hoisted(() => ({
   listSessions: vi.fn(),
   createSession: vi.fn(),
+  getSession: vi.fn(),
   deleteSession: vi.fn(),
   archiveSession: vi.fn(),
   restoreSession: vi.fn(),
+  pinSession: vi.fn(),
+  unpinSession: vi.fn(),
   listMessages: vi.fn(),
   createChatTurn: vi.fn(),
   getChatTurn: vi.fn(),
@@ -53,6 +56,7 @@ const session = (id: string): SessionVO => ({
   created_at: '2026-08-30T00:00:00.000Z',
   updated_at: '2026-08-30T00:00:00.000Z',
   message_count: 0,
+  pinned_at: null,
 })
 
 const attachment = {
@@ -79,6 +83,12 @@ const turn = (patch: Partial<ChatTurnVO> = {}): ChatTurnVO => ({
   assistant: null,
   ...patch,
 })
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>(done => { resolve = done })
+  return { promise, resolve }
+}
 
 function setupStore() {
   setActivePinia(createPinia())
@@ -123,6 +133,7 @@ describe('chat store multi-session runtime', () => {
     })
     chatApi.listMessages.mockResolvedValue([])
     chatApi.listSessions.mockResolvedValue([session('session-a'), session('session-b')])
+    chatApi.getSession.mockImplementation(async (id: string) => session(id))
   })
 
   it('archives the active session and opens a new-session state', async () => {
@@ -175,9 +186,142 @@ describe('chat store multi-session runtime', () => {
     expect(chatApi.restoreSession).toHaveBeenCalledWith('session-a')
     expect(chatApi.listSessions).toHaveBeenCalledWith('space-1')
     expect(store.sessions.map(item => item.id)).toEqual([
+      'session-b',
+      'session-a',
+    ])
+  })
+
+  it('pins a session and moves it ahead of older pinned sessions', async () => {
+    const store = setupStore()
+    store.sessions[1].pinned_at = '2026-08-01T00:00:00.000Z'
+    chatApi.pinSession.mockResolvedValue({
+      ...session('session-a'),
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+
+    await store.togglePinSession('session-a')
+
+    expect(chatApi.pinSession).toHaveBeenCalledWith('session-a')
+    expect(store.sessions.map(item => item.id)).toEqual([
       'session-a',
       'session-b',
     ])
+    expect(store.sessions[0].pinned_at).not.toBeNull()
+  })
+
+  it('unpins a session and returns it to updated-time ordering', async () => {
+    const store = setupStore()
+    store.sessions = [
+      { ...session('session-a'), pinned_at: '2026-09-01T00:00:00.000Z' },
+      { ...session('session-b'), updated_at: '2026-08-31T00:00:00.000Z' },
+    ]
+    chatApi.unpinSession.mockResolvedValue(session('session-a'))
+
+    await store.togglePinSession('session-a')
+
+    expect(chatApi.unpinSession).toHaveBeenCalledWith('session-a')
+    expect(store.sessions.map(item => item.id)).toEqual([
+      'session-b',
+      'session-a',
+    ])
+    expect(store.sessions[1].pinned_at).toBeNull()
+  })
+
+  it('keeps pin state unchanged when the request fails', async () => {
+    const store = setupStore()
+    chatApi.pinSession.mockRejectedValue(new Error('network'))
+
+    await expect(store.togglePinSession('session-a')).rejects.toThrow('network')
+
+    expect(store.sessions[0].pinned_at).toBeNull()
+    expect(store.sessions.map(item => item.id)).toEqual([
+      'session-a',
+      'session-b',
+    ])
+  })
+
+  it('does not let a stale activity response erase a newer pin', async () => {
+    const store = setupStore()
+    const activity = deferred<SessionVO>()
+    chatApi.getSession.mockReturnValue(activity.promise)
+    chatApi.pinSession.mockResolvedValue({
+      ...session('session-a'),
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+    await store.switchSession('session-a')
+    await store.sendMessage('新的问题')
+    streams.chat.get('session-a')!.callbacks.onDone('回答完成', [])
+
+    await store.togglePinSession('session-a')
+    activity.resolve({
+      ...session('session-a'),
+      updated_at: '2026-09-01T02:29:00.000Z',
+      pinned_at: null,
+    })
+
+    await vi.waitFor(() => {
+      expect(store.sessions.find(item => item.id === 'session-a')?.updated_at)
+        .toBe('2026-09-01T02:29:00.000Z')
+    })
+    expect(store.sessions.find(item => item.id === 'session-a')?.pinned_at)
+      .toBe('2026-09-01T02:30:00.000Z')
+  })
+
+  it('does not let a stale pin response erase newer activity metadata', async () => {
+    const store = setupStore()
+    const pin = deferred<SessionVO>()
+    chatApi.pinSession.mockReturnValue(pin.promise)
+    chatApi.getSession.mockResolvedValue({
+      ...session('session-a'),
+      title: '服务端新标题',
+      message_count: 2,
+      updated_at: '2026-09-01T03:00:00.000Z',
+      pinned_at: null,
+    })
+    await store.switchSession('session-a')
+    await store.sendMessage('新的问题')
+
+    const pinRequest = store.togglePinSession('session-a')
+    streams.chat.get('session-a')!.callbacks.onDone('回答完成', [])
+    await vi.waitFor(() => {
+      expect(store.sessions[0].updated_at).toBe('2026-09-01T03:00:00.000Z')
+    })
+    pin.resolve({
+      ...session('session-a'),
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+    await pinRequest
+
+    expect(store.sessions[0]).toMatchObject({
+      title: '服务端新标题',
+      message_count: 2,
+      updated_at: '2026-09-01T03:00:00.000Z',
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+  })
+
+  it('moves an older ordinary session to the front after server activity', async () => {
+    const store = setupStore()
+    store.sessions = [
+      { ...session('session-b'), updated_at: '2026-08-31T00:00:00.000Z' },
+      { ...session('session-a'), updated_at: '2026-08-20T00:00:00.000Z' },
+    ]
+    chatApi.getSession.mockResolvedValue({
+      ...session('session-a'),
+      updated_at: '2026-09-01T03:00:00.000Z',
+    })
+    await store.switchSession('session-a')
+    await store.sendMessage('新的问题')
+
+    streams.chat.get('session-a')!.callbacks.onDone('回答完成', [])
+
+    await vi.waitFor(() => {
+      expect(store.sessions.map(item => item.id)).toEqual([
+        'session-a',
+        'session-b',
+      ])
+    })
+    expect(chatApi.getSession).toHaveBeenCalledWith('session-a')
   })
 
   it('keeps session A streaming after the user switches to session B', async () => {
@@ -299,6 +443,35 @@ describe('chat store multi-session runtime', () => {
       file,
       expect.any(Function),
     )
+  })
+
+  it('moves an older ordinary session after creating an attachment turn', async () => {
+    const store = setupStore()
+    store.sessions = [
+      { ...session('session-b'), updated_at: '2026-08-31T00:00:00.000Z' },
+      { ...session('session-a'), updated_at: '2026-08-20T00:00:00.000Z' },
+    ]
+    mockTurnIds()
+    chatApi.createChatTurn.mockResolvedValue(turn())
+    chatApi.uploadTurnAttachment.mockResolvedValue(turn())
+    chatApi.getChatTurn.mockResolvedValue(turn())
+    chatApi.getSession.mockResolvedValue({
+      ...session('session-a'),
+      updated_at: '2026-09-01T03:00:00.000Z',
+    })
+    await store.switchSession('session-a')
+
+    await store.submitTurn(
+      '总结附件',
+      [new File(['data'], 'report.pdf', { type: 'application/pdf' })],
+    )
+
+    await vi.waitFor(() => {
+      expect(store.sessions.map(item => item.id)).toEqual([
+        'session-a',
+        'session-b',
+      ])
+    })
   })
 
   it('starts exactly one answer stream when polling reports the turn ready', async () => {

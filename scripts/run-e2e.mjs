@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process'
 
-const rootUrl = 'http://127.0.0.1:3300'
+const rootUrl = 'http://127.0.0.1:4173'
 const server = spawn(process.execPath, ['scripts/e2e-server.mjs'], {
   stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
 })

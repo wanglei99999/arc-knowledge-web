@@ -6,6 +6,9 @@ interface SessionRecord {
   summary: string | null
   message_count: number
   archived_at?: string
+  pinned_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 const apiOrigin = 'http://localhost:8000'
@@ -14,7 +17,7 @@ function corsHeaders() {
   return {
     'access-control-allow-headers': 'Authorization, Content-Type, X-Tenant-Id',
     'access-control-allow-methods': 'GET, POST, OPTIONS',
-    'access-control-allow-origin': 'http://127.0.0.1:3300',
+    'access-control-allow-origin': 'http://127.0.0.1:4173',
     'content-type': 'application/json',
   }
 }
@@ -34,6 +37,9 @@ async function installArchiveApiMocks(page: Page) {
       title: '接入鉴权方案',
       summary: null,
       message_count: 4,
+      pinned_at: '2026-09-01T02:30:00Z',
+      created_at: '2026-08-20T01:00:00Z',
+      updated_at: '2026-08-31T09:15:00Z',
     },
   ]
   const archived: SessionRecord[] = []
@@ -96,6 +102,7 @@ async function installArchiveApiMocks(page: Page) {
         archived.unshift({
           ...active.splice(index, 1)[0],
           archived_at: '2026-09-01T01:00:00Z',
+          pinned_at: null,
         })
       }
       await route.fulfill({ status: 204, headers: corsHeaders() })
@@ -108,6 +115,7 @@ async function installArchiveApiMocks(page: Page) {
       if (index >= 0) {
         const [restored] = archived.splice(index, 1)
         delete restored.archived_at
+        restored.pinned_at = null
         active.unshift(restored)
       }
       await route.fulfill({ status: 204, headers: corsHeaders() })
@@ -145,4 +153,6 @@ test('archive in sidebar and restore from personal settings', async ({ page }) =
   await expect(restoreButton).toBeVisible()
   await restoreButton.click()
   await expect(restoreButton).toHaveCount(0)
+  await expect(page.getByLabel('已置顶')).toHaveCount(0)
+  await expect(page.getByLabel('置顶会话 接入鉴权方案')).toHaveCount(1)
 })

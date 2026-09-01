@@ -9,12 +9,15 @@ import {
   createChatTurn,
   createSession,
   deleteSession,
+  getSession as apiGetSession,
   getChatTurn,
   ignoreTurnAttachment,
   listMessages,
   listSessions,
+  pinSession as apiPinSession,
   retryTurnAttachment,
   restoreSession as apiRestoreSession,
+  unpinSession as apiUnpinSession,
   uploadTurnAttachment,
 } from '@/api/chat'
 import { useSpacesStore } from '@/stores/spaces'
@@ -85,6 +88,22 @@ function localMessageId(role: MessageVO['role']): string {
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random()}`
   return `${role}-${suffix}`
+}
+
+function sortSessions(items: SessionVO[]): SessionVO[] {
+  return [...items].sort((left, right) => {
+    if (left.pinned_at && right.pinned_at) {
+      const pinnedOrder = Date.parse(right.pinned_at) - Date.parse(left.pinned_at)
+      if (pinnedOrder !== 0) return pinnedOrder
+      return right.id.localeCompare(left.id)
+    }
+    if (left.pinned_at) return -1
+    if (right.pinned_at) return 1
+    const updatedOrder = Date.parse(right.updated_at) - Date.parse(left.updated_at)
+    return updatedOrder !== 0
+      ? updatedOrder
+      : right.id.localeCompare(left.id)
+  })
 }
 
 export const useChatStore = defineStore('chat', () => {
@@ -408,7 +427,9 @@ export const useChatStore = defineStore('chat', () => {
   async function fetchSessions() {
     sessionsLoading.value = true
     try {
-      sessions.value = await listSessions(spacesStore.currentSpace?.space_id)
+      sessions.value = sortSessions(
+        await listSessions(spacesStore.currentSpace?.space_id),
+      )
       if (sessions.value.length && !activeSessionId.value) {
         await switchSession(sessions.value[0].id)
       }
@@ -479,6 +500,43 @@ export const useChatStore = defineStore('chat', () => {
     if (activeSessionId.value === id) newSession()
   }
 
+  function applyPinState(latest: SessionVO) {
+    sessions.value = sortSessions(sessions.value.map(item => (
+      item.id === latest.id
+        ? { ...item, pinned_at: latest.pinned_at }
+        : item
+    )))
+  }
+
+  function applyActivityMetadata(latest: SessionVO) {
+    const current = sessions.value.find(item => item.id === latest.id)
+    if (!current
+      || Date.parse(latest.updated_at) < Date.parse(current.updated_at)) return
+    sessions.value = sortSessions(sessions.value.map(item => (
+      item.id === latest.id
+        ? { ...latest, pinned_at: item.pinned_at }
+        : item
+    )))
+  }
+
+  async function syncSessionFromServer(sessionId: string) {
+    try {
+      applyActivityMetadata(await apiGetSession(sessionId))
+    } catch {
+      // 消息本身已经成功；排序元数据会在下次列表刷新时重新同步。
+    }
+  }
+
+  async function togglePinSession(id: string) {
+    const session = sessions.value.find(item => item.id === id)
+    if (!session) return
+
+    const latest = session.pinned_at
+      ? await apiUnpinSession(id)
+      : await apiPinSession(id)
+    applyPinState(latest)
+  }
+
   async function restoreArchivedSession(id: string) {
     await apiRestoreSession(id)
     if (spacesStore.currentSpace) await fetchSessions()
@@ -493,7 +551,7 @@ export const useChatStore = defineStore('chat', () => {
         '新会话',
         spacesStore.currentSpace?.space_id,
       )
-      sessions.value = [session, ...sessions.value]
+      sessions.value = sortSessions([session, ...sessions.value])
       pendingNew.value = false
       activeSessionId.value = session.id
       return session.id
@@ -558,8 +616,8 @@ export const useChatStore = defineStore('chat', () => {
             session.title = question.slice(0, 24) + (question.length > 24 ? '…' : '')
           }
           session.message_count += 2
-          session.updated_at = new Date().toISOString()
         }
+        void syncSessionFromServer(sessionId)
       },
       onError(error) {
         patchMessage(sessionId, assistantMessage.id, {
@@ -637,6 +695,7 @@ export const useChatStore = defineStore('chat', () => {
     }
 
     applyTurn(sessionId, created)
+    void syncSessionFromServer(sessionId)
     submittingBySession.value[sessionId] = false
     pendingTurnsBySession.value[sessionId] = created.turn_id
     persistRuntime()
@@ -906,7 +965,7 @@ export const useChatStore = defineStore('chat', () => {
     if (!newId || newId === oldId) return
 
     if (!oldId) {
-      sessions.value = await listSessions(newId)
+      sessions.value = sortSessions(await listSessions(newId))
       await resumePendingTurns()
       return
     }
@@ -936,6 +995,7 @@ export const useChatStore = defineStore('chat', () => {
     newSession,
     removeSession,
     archiveSession,
+    togglePinSession,
     restoreArchivedSession,
     sendMessage,
     submitTurn,
