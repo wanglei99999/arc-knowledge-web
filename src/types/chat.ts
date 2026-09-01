@@ -86,6 +86,7 @@ export interface SessionVO {
   created_at: string
   updated_at: string
   message_count: number
+  pinned_at: string | null
 }
 
 export interface ArchivedSessionVO {

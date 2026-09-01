@@ -10,6 +10,7 @@ const session: SessionVO = {
   created_at: '2026-08-30T00:00:00.000Z',
   updated_at: '2026-08-30T00:00:00.000Z',
   message_count: 2,
+  pinned_at: null,
 }
 
 describe('SessionRow', () => {
@@ -57,5 +58,32 @@ describe('SessionRow', () => {
     expect(
       wrapper.find('[aria-label="会话已完成，有未读结果"]').exists(),
     ).toBe(true)
+  })
+
+  it('emits pin from a named button even while the session is busy', async () => {
+    const wrapper = mount(SessionRow, {
+      props: { session, active: false, busy: true },
+    })
+
+    await wrapper.get('[aria-label="置顶会话 接入鉴权方案"]').trigger('click')
+
+    expect(wrapper.emitted('pin')).toEqual([['session-1']])
+  })
+
+  it('exposes cancel pin and a visible marker for a pinned session', async () => {
+    const wrapper = mount(SessionRow, {
+      props: {
+        session: { ...session, pinned_at: '2026-09-01T02:30:00Z' },
+        active: false,
+        busy: false,
+      },
+    })
+
+    expect(wrapper.find('[aria-label="已置顶"]').exists()).toBe(true)
+    await wrapper
+      .get('[aria-label="取消置顶会话 接入鉴权方案"]')
+      .trigger('click')
+
+    expect(wrapper.emitted('pin')).toEqual([['session-1']])
   })
 })

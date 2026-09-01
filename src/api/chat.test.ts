@@ -256,4 +256,32 @@ describe('chat turn API', () => {
       '/sessions/session-1/restore',
     )
   })
+
+  it('preserves pin state and uses pin lifecycle routes', async () => {
+    const pinnedSession = {
+      session_id: 'session-1',
+      title: '接入鉴权方案',
+      summary: null,
+      message_count: 2,
+      pinned_at: '2026-09-01T02:30:00Z',
+      created_at: '2026-08-20T01:00:00Z',
+      updated_at: '2026-08-31T09:15:00Z',
+    }
+    http.get.mockResolvedValue([pinnedSession])
+    http.post
+      .mockResolvedValueOnce(pinnedSession)
+      .mockResolvedValueOnce({ ...pinnedSession, pinned_at: null })
+
+    const sessions = await api().listSessions('space-1')
+    const pinned = await api().pinSession('session-1')
+    const unpinned = await api().unpinSession('session-1')
+
+    expect(sessions[0].pinned_at).toBe('2026-09-01T02:30:00Z')
+    expect(sessions[0].created_at).toBe('2026-08-20T01:00:00Z')
+    expect(sessions[0].updated_at).toBe('2026-08-31T09:15:00Z')
+    expect(pinned.pinned_at).toBe('2026-09-01T02:30:00Z')
+    expect(unpinned.pinned_at).toBeNull()
+    expect(http.post).toHaveBeenNthCalledWith(1, '/sessions/session-1/pin')
+    expect(http.post).toHaveBeenNthCalledWith(2, '/sessions/session-1/unpin')
+  })
 })

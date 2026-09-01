@@ -14,8 +14,13 @@ const spacesApi = vi.hoisted(() => ({
   restoreSpace: vi.fn(),
 }))
 
+const activeChat = vi.hoisted(() => ({
+  fetchSessions: vi.fn(),
+}))
+
 vi.mock('@/api/chat', () => chatApi)
 vi.mock('@/api/spaces', () => spacesApi)
+vi.mock('@/stores/chat', () => ({ useChatStore: () => activeChat }))
 
 const archivedSession = (
   status: 'active' | 'archived' = 'active',
@@ -49,6 +54,7 @@ describe('ArchivedChatsView', () => {
     vi.resetAllMocks()
     chatApi.restoreSession.mockResolvedValue(undefined)
     spacesApi.restoreSpace.mockResolvedValue(undefined)
+    activeChat.fetchSessions.mockResolvedValue(undefined)
   })
 
   it('renders archived sessions grouped by their original space', async () => {
@@ -94,6 +100,7 @@ describe('ArchivedChatsView', () => {
     await flushPromises()
 
     expect(chatApi.restoreSession).toHaveBeenCalledWith('session-1')
+    expect(activeChat.fetchSessions).toHaveBeenCalledOnce()
     expect(wrapper.text()).not.toContain('旧版上传流程')
   })
 })

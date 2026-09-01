@@ -9,9 +9,12 @@ import { useSpacesStore } from '@/stores/spaces'
 const chatApi = vi.hoisted(() => ({
   listSessions: vi.fn().mockResolvedValue([]),
   createSession: vi.fn(),
+  getSession: vi.fn(),
   deleteSession: vi.fn(),
   archiveSession: vi.fn().mockResolvedValue(undefined),
   restoreSession: vi.fn().mockResolvedValue(undefined),
+  pinSession: vi.fn().mockResolvedValue(undefined),
+  unpinSession: vi.fn().mockResolvedValue(undefined),
   listMessages: vi.fn().mockResolvedValue([]),
   createChatTurn: vi.fn(),
   getChatTurn: vi.fn(),
@@ -60,6 +63,7 @@ function setupSessions() {
       created_at: '2026-08-30T00:00:00.000Z',
       updated_at: '2026-08-30T00:00:00.000Z',
       message_count: 2,
+      pinned_at: null,
     },
     {
       id: 'session-failed',
@@ -67,6 +71,7 @@ function setupSessions() {
       created_at: '2026-08-30T00:00:00.000Z',
       updated_at: '2026-08-30T00:00:00.000Z',
       message_count: 1,
+      pinned_at: null,
     },
   ]
   return chatStore
@@ -90,6 +95,8 @@ describe('AppSidebar session notifications', () => {
     chatApi.listSessions.mockResolvedValue([])
     chatApi.archiveSession.mockResolvedValue(undefined)
     chatApi.restoreSession.mockResolvedValue(undefined)
+    chatApi.pinSession.mockResolvedValue(undefined)
+    chatApi.unpinSession.mockResolvedValue(undefined)
   })
 
   it('renders completed and failed unread results with different accessible dots', () => {
@@ -126,5 +133,19 @@ describe('AppSidebar session notifications', () => {
     expect(ui.notificationClose).toHaveBeenCalledWith(
       'session-archive-session-complete',
     )
+  })
+
+  it('pins a session from its row action', async () => {
+    const chatStore = setupSessions()
+    chatApi.pinSession.mockResolvedValue({
+      ...chatStore.sessions[0],
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+    const wrapper = mountSidebar()
+
+    await wrapper.get('[aria-label="置顶会话 已完成会话"]').trigger('click')
+    await Promise.resolve()
+
+    expect(chatApi.pinSession).toHaveBeenCalledWith('session-complete')
   })
 })

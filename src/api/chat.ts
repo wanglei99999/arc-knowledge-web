@@ -19,6 +19,9 @@ interface SessionOut {
   title: string | null
   summary: string | null
   message_count: number
+  pinned_at: string | null
+  created_at: string
+  updated_at: string
 }
 
 interface ArchivedSessionOut {
@@ -90,13 +93,13 @@ interface MessageOut {
 }
 
 function toSessionVO(s: SessionOut): SessionVO {
-  const now = new Date().toISOString()
   return {
     id: s.session_id,
     title: s.title ?? '新会话',
-    created_at: now,
-    updated_at: now,
+    created_at: s.created_at,
+    updated_at: s.updated_at,
     message_count: s.message_count,
+    pinned_at: s.pinned_at,
   }
 }
 
@@ -169,6 +172,18 @@ export async function deleteSession(id: string): Promise<void> {
 
 export async function archiveSession(id: string): Promise<void> {
   await http.post<void>(`/sessions/${id}/archive`)
+}
+
+export async function getSession(id: string): Promise<SessionVO> {
+  return toSessionVO(await http.get<SessionOut>(`/sessions/${id}`))
+}
+
+export async function pinSession(id: string): Promise<SessionVO> {
+  return toSessionVO(await http.post<SessionOut>(`/sessions/${id}/pin`))
+}
+
+export async function unpinSession(id: string): Promise<SessionVO> {
+  return toSessionVO(await http.post<SessionOut>(`/sessions/${id}/unpin`))
 }
 
 export async function restoreSession(id: string): Promise<void> {

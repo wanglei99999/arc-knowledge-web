@@ -4,8 +4,10 @@ import dayjs from 'dayjs'
 import { ArchiveRestore, FolderArchive, RotateCcw, Search } from 'lucide-vue-next'
 
 import { useArchiveStore } from '@/stores/archive'
+import { useChatStore } from '@/stores/chat'
 
 const archiveStore = useArchiveStore()
+const chatStore = useChatStore()
 const restoringSession = ref<string | null>(null)
 const restoringSpace = ref<string | null>(null)
 
@@ -55,6 +57,7 @@ async function restoreSession(sessionId: string) {
   restoringSession.value = sessionId
   try {
     await archiveStore.restore(sessionId)
+    await chatStore.fetchSessions()
   } finally {
     restoringSession.value = null
   }
