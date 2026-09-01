@@ -65,12 +65,16 @@ describe('SessionRow', () => {
       props: { session, active: false, busy: true },
     })
 
-    await wrapper.get('[aria-label="置顶会话 接入鉴权方案"]').trigger('click')
+    const pinButton = wrapper.get('[aria-label="置顶会话 接入鉴权方案"]')
+    expect(pinButton.findAll('svg')).toHaveLength(1)
+    expect(pinButton.get('svg').classes()).toContain('lucide-pin-icon')
+    expect(pinButton.get('svg').attributes('fill')).toBe('none')
+    await pinButton.trigger('click')
 
     expect(wrapper.emitted('pin')).toEqual([['session-1']])
   })
 
-  it('exposes cancel pin and a visible marker for a pinned session', async () => {
+  it('uses the same single pin button with a solid icon when pinned', async () => {
     const wrapper = mount(SessionRow, {
       props: {
         session: { ...session, pinned_at: '2026-09-01T02:30:00Z' },
@@ -79,10 +83,14 @@ describe('SessionRow', () => {
       },
     })
 
-    expect(wrapper.find('[aria-label="已置顶"]').exists()).toBe(true)
-    await wrapper
-      .get('[aria-label="取消置顶会话 接入鉴权方案"]')
-      .trigger('click')
+    expect(wrapper.find('[aria-label="已置顶"]').exists()).toBe(false)
+    const pinButton = wrapper.get(
+      '[aria-label="取消置顶会话 接入鉴权方案"]',
+    )
+    expect(pinButton.findAll('svg')).toHaveLength(1)
+    expect(pinButton.get('svg').classes()).toContain('lucide-pin-icon')
+    expect(pinButton.get('svg').attributes('fill')).toBe('currentColor')
+    await pinButton.trigger('click')
 
     expect(wrapper.emitted('pin')).toEqual([['session-1']])
   })

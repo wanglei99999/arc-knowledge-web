@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { Archive, MoreHorizontal, Pin, PinOff } from 'lucide-vue-next'
+import { Archive, MoreHorizontal, Pin } from 'lucide-vue-next'
 
 import SessionNotificationDot from '@/components/layout/SessionNotificationDot.vue'
 import { cn } from '@/lib/utils'
@@ -51,12 +51,6 @@ function pin() {
       @click="emit('open', session.id)"
     >
       <span class="min-w-0 flex-1 truncate">{{ session.title }}</span>
-      <Pin
-        v-if="session.pinned_at"
-        aria-label="已置顶"
-        class="h-3.5 w-3.5 shrink-0 text-graphite-45"
-        :stroke-width="1.5"
-      />
       <SessionNotificationDot v-if="notification" :status="notification" />
     </button>
 
@@ -68,8 +62,11 @@ function pin() {
         class="session-direct-action grid h-6 w-6 place-items-center rounded-xs text-graphite-45 hover:bg-desk-sunken hover:text-graphite focus-visible:outline focus-visible:outline-2 focus-visible:outline-accent-blue"
         @click="pin"
       >
-        <PinOff v-if="session.pinned_at" class="h-3.5 w-3.5" :stroke-width="1.5" />
-        <Pin v-else class="h-3.5 w-3.5" :stroke-width="1.5" />
+        <Pin
+          class="h-3.5 w-3.5"
+          :fill="session.pinned_at ? 'currentColor' : 'none'"
+          :stroke-width="1.5"
+        />
       </button>
 
       <button
@@ -104,8 +101,11 @@ function pin() {
         class="flex h-8 w-full items-center gap-sm rounded-sm px-sm text-body-sm text-graphite hover:bg-desk-hover"
         @click="pin"
       >
-        <PinOff v-if="session.pinned_at" class="h-4 w-4" :stroke-width="1.5" />
-        <Pin v-else class="h-4 w-4" :stroke-width="1.5" />
+        <Pin
+          class="h-4 w-4"
+          :fill="session.pinned_at ? 'currentColor' : 'none'"
+          :stroke-width="1.5"
+        />
         {{ session.pinned_at ? '取消置顶' : '置顶' }}
       </button>
 

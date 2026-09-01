@@ -153,6 +153,6 @@ test('archive in sidebar and restore from personal settings', async ({ page }) =
   await expect(restoreButton).toBeVisible()
   await restoreButton.click()
   await expect(restoreButton).toHaveCount(0)
-  await expect(page.getByLabel('已置顶')).toHaveCount(0)
+  await expect(page.getByLabel(/^取消置顶会话 /)).toHaveCount(0)
   await expect(page.getByLabel('置顶会话 接入鉴权方案')).toHaveCount(1)
 })
