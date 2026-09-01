@@ -131,16 +131,18 @@ test('multiple pins use server order and unpin restores updated order', async ({
   await page.getByLabel('置顶会话 较早更新会话').click()
 
   await expect(sessionLinks.nth(0)).toHaveAccessibleName('打开会话 较早更新会话')
-  await expect(page.getByLabel('已置顶')).toBeVisible()
+  await expect(
+    page.getByLabel('取消置顶会话 较早更新会话').locator('svg'),
+  ).toHaveAttribute('fill', 'currentColor')
 
   await page.getByLabel('打开会话 最近更新会话').hover()
   await page.getByLabel('置顶会话 最近更新会话').click()
 
   await expect(sessionLinks.nth(0)).toHaveAccessibleName('打开会话 最近更新会话')
-  await expect(page.getByLabel('已置顶')).toHaveCount(2)
+  await expect(page.getByLabel(/^取消置顶会话 /)).toHaveCount(2)
 
   await page.reload()
-  await expect(page.getByLabel('已置顶')).toHaveCount(2)
+  await expect(page.getByLabel(/^取消置顶会话 /)).toHaveCount(2)
 
   await page.getByLabel('打开会话 最近更新会话').hover()
   await page.getByLabel('取消置顶会话 最近更新会话').click()
@@ -150,5 +152,8 @@ test('multiple pins use server order and unpin restores updated order', async ({
   await page.getByLabel('取消置顶会话 较早更新会话').click()
 
   await expect(sessionLinks.nth(0)).toHaveAccessibleName('打开会话 最近更新会话')
-  await expect(page.getByLabel('已置顶')).toHaveCount(0)
+  await expect(page.getByLabel(/^取消置顶会话 /)).toHaveCount(0)
+  await expect(
+    page.getByLabel('置顶会话 较早更新会话').locator('svg'),
+  ).toHaveAttribute('fill', 'none')
 })
