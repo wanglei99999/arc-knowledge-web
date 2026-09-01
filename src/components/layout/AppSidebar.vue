@@ -110,6 +110,19 @@ async function togglePinSession(id: string) {
   }
 }
 
+async function renameSession(
+  id: string,
+  title: string,
+  complete: (saved: boolean) => void,
+) {
+  try {
+    await chatStore.renameSession(id, title)
+    complete(true)
+  } catch {
+    complete(false)
+  }
+}
+
 async function handleCreateSpace() {
   const name = newSpaceName.value.trim()
   if (!name || creating.value) return
@@ -270,6 +283,7 @@ async function handleCreateSpace() {
                 :notification="chatStore.sessionNotification(session.id)"
                 @open="openSession"
                 @pin="togglePinSession"
+                @rename="renameSession"
                 @archive="archiveSession(session.id, session.title)"
               />
 

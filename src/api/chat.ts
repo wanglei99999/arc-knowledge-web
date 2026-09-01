@@ -186,6 +186,13 @@ export async function unpinSession(id: string): Promise<SessionVO> {
   return toSessionVO(await http.post<SessionOut>(`/sessions/${id}/unpin`))
 }
 
+export async function renameSession(
+  id: string,
+  title: string,
+): Promise<SessionVO> {
+  return toSessionVO(await http.patch<SessionOut>(`/sessions/${id}`, { title }))
+}
+
 export async function restoreSession(id: string): Promise<void> {
   await http.post<void>(`/sessions/${id}/restore`)
 }

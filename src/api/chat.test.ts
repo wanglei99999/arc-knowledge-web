@@ -284,4 +284,31 @@ describe('chat turn API', () => {
     expect(http.post).toHaveBeenNthCalledWith(1, '/sessions/session-1/pin')
     expect(http.post).toHaveBeenNthCalledWith(2, '/sessions/session-1/unpin')
   })
+
+  it('renames a session with PATCH and hydrates the authoritative result', async () => {
+    const renamedSession = {
+      session_id: 'session-1',
+      title: '新的标题',
+      summary: null,
+      message_count: 2,
+      pinned_at: null,
+      created_at: '2026-08-20T01:00:00Z',
+      updated_at: '2026-08-31T09:15:00Z',
+    }
+    http.patch.mockResolvedValue(renamedSession)
+
+    const result = await api().renameSession('session-1', '新的标题')
+
+    expect(http.patch).toHaveBeenCalledWith('/sessions/session-1', {
+      title: '新的标题',
+    })
+    expect(result).toEqual({
+      id: 'session-1',
+      title: '新的标题',
+      message_count: 2,
+      pinned_at: null,
+      created_at: '2026-08-20T01:00:00Z',
+      updated_at: '2026-08-31T09:15:00Z',
+    })
+  })
 })

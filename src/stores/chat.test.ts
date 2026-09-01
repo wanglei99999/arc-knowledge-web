@@ -15,6 +15,7 @@ const chatApi = vi.hoisted(() => ({
   restoreSession: vi.fn(),
   pinSession: vi.fn(),
   unpinSession: vi.fn(),
+  renameSession: vi.fn(),
   listMessages: vi.fn(),
   createChatTurn: vi.fn(),
   getChatTurn: vi.fn(),
@@ -238,6 +239,69 @@ describe('chat store multi-session runtime', () => {
       'session-a',
       'session-b',
     ])
+  })
+
+  it('renames a session without changing its order or pin state', async () => {
+    const store = setupStore()
+    store.sessions[0].pinned_at = '2026-09-01T02:30:00.000Z'
+    chatApi.renameSession.mockResolvedValue({
+      ...session('session-a'),
+      title: '新的标题',
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+
+    await store.renameSession('session-a', '新的标题')
+
+    expect(store.sessions.map(item => item.id)).toEqual([
+      'session-a',
+      'session-b',
+    ])
+    expect(store.sessions[0]).toMatchObject({
+      title: '新的标题',
+      pinned_at: '2026-09-01T02:30:00.000Z',
+    })
+  })
+
+  it('does not replace a manually renamed empty-session title after its first answer', async () => {
+    const store = setupStore()
+    store.sessions[0].title = '手动标题'
+    chatApi.getSession.mockResolvedValue({
+      ...session('session-a'),
+      title: '手动标题',
+      message_count: 2,
+    })
+    await store.switchSession('session-a')
+    await store.sendMessage('第一条很长的问题内容')
+
+    streams.chat.get('session-a')!.callbacks.onDone('回答完成', [])
+
+    expect(store.sessions[0].title).toBe('手动标题')
+  })
+
+  it('does not let an older activity response overwrite a completed rename', async () => {
+    const store = setupStore()
+    const activity = deferred<SessionVO>()
+    chatApi.getSession.mockReturnValue(activity.promise)
+    chatApi.renameSession.mockResolvedValue({
+      ...session('session-a'),
+      title: '手动标题',
+    })
+    await store.switchSession('session-a')
+    await store.sendMessage('新的问题')
+    streams.chat.get('session-a')!.callbacks.onDone('回答完成', [])
+
+    await store.renameSession('session-a', '手动标题')
+    activity.resolve({
+      ...session('session-a'),
+      title: '旧标题',
+      message_count: 2,
+      updated_at: '2026-09-01T03:00:00.000Z',
+    })
+
+    await vi.waitFor(() => {
+      expect(store.sessions[0].updated_at).toBe('2026-09-01T03:00:00.000Z')
+    })
+    expect(store.sessions[0].title).toBe('手动标题')
   })
 
   it('does not let a stale activity response erase a newer pin', async () => {
