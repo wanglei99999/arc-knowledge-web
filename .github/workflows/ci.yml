@@ -78,4 +78,5 @@ jobs:
           tags: incipit-web:ci
 
       - name: 校验 Nginx 配置
-        run: docker run --rm incipit-web:ci nginx -t
+        # Compose 运行时会提供 api DNS；独立镜像检查需要临时提供同名解析。
+        run: docker run --rm --add-host api:127.0.0.1 incipit-web:ci nginx -t
