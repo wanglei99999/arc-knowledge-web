@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { defineStore } from 'pinia'
 import { listSpaces, createSpace as apiCreateSpace, deleteSpace as apiDeleteSpace } from '@/api/spaces'
 import type { SpaceVO } from '@/types/space'
+import type { CreateSpace } from '@/api/spaces'
 
 export const useSpacesStore = defineStore('spaces', () => {
     const spaces = ref<SpaceVO[]>([])
@@ -17,6 +18,7 @@ export const useSpacesStore = defineStore('spaces', () => {
 
     async function fetchSpaces() {
         spaces.value = await listSpaces()
+        if (currentSpaceId.value && !spaces.value.some(s => s.space_id === currentSpaceId.value)) clearSpace()
         // 只在从没选过时替用户选一次。这里必须比对 null 而不是假值：
         // 叉掉之后存的是 ''，那是「主动清空」，重进不该又替他选回来
         if (localStorage.getItem('current_space_id') === null && spaces.value.length) {
@@ -35,7 +37,7 @@ export const useSpacesStore = defineStore('spaces', () => {
         localStorage.setItem('current_space_id', '')
     }
 
-    async function createSpace(name: string) {
+    async function createSpace(name: string | CreateSpace) {
         const space = await apiCreateSpace(name)
         spaces.value.push(space)
         switchSpace(space.space_id)

@@ -43,6 +43,11 @@ const router = createRouter({
           component: () => import('@/views/search/index.vue'),
         },
         {
+          path: 'permissions',
+          name: 'permissions',
+          component: () => import('@/views/permissions/index.vue'),
+        },
+        {
           path: 'admin',
           name: 'admin',
           component: () => import('@/views/admin/index.vue'),
@@ -69,12 +74,16 @@ const router = createRouter({
 })
 
 // 全局导航守卫：每次路由跳转前执行，to 是目标路由对象
-router.beforeEach((to)=>{
+router.beforeEach(async (to)=>{
   const authStore = useAuthStore()
   // 目标页需要登录但未登录 → 拦截并跳转到登录页
   if(to.meta.requiresAuth && !authStore.isLoggedIn){
     return {name:'login'}
   }
+  if (to.meta.requiresAuth && !authStore.context) {
+    try { await authStore.loadContext() } catch { await authStore.logout(); return { name: 'login' } }
+  }
+  if (to.name === 'admin' && !authStore.isAdmin) return { name: 'dashboard' }
   // 已登录还访问登录/注册页 → 跳回首页，避免重复登录
   if((to.name === 'login' || to.name === 'register') && authStore.isLoggedIn){
     return {name:'dashboard'}

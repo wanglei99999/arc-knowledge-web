@@ -2,8 +2,9 @@ import { createPinia, setActivePinia } from 'pinia'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import * as sse from '@/utils/sse'
-import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useSpacesStore } from '@/stores/spaces'
+import * as identityContext from './context'
 
 function sseResponse(events: string[]) {
   const encoder = new TextEncoder()
@@ -25,11 +26,19 @@ function sseResponse(events: string[]) {
 }
 
 describe('chat SSE streams', () => {
+  it('does not start a late stream after its identity was invalidated', () => {
+    setActivePinia(createPinia())
+    vi.spyOn(identityContext, 'contextSignal').mockReturnValue(AbortSignal.abort())
+    const fetchMock = vi.fn().mockResolvedValue(sseResponse([]))
+    vi.stubGlobal('fetch', fetchMock)
+    useAuthStore().accessToken = 'new-tenant-token'
+    sse.streamTurnAnswer('old-turn', { onChunk: vi.fn(), onDone: vi.fn(), onError: vi.fn() })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
     vi.restoreAllMocks()
-    useAppStore().tenantId = 'tenant-1'
     useAuthStore().accessToken = 'token-1'
   })
 
@@ -68,6 +77,17 @@ describe('chat SSE streams', () => {
     expect(onError).toHaveBeenCalledWith(new Error('附件尚未完成入库'))
     expect(onDone).not.toHaveBeenCalled()
   })
+  it('revalidates space access when a streaming endpoint returns forbidden', async () => {
+    const spaces = useSpacesStore()
+    spaces.spaces = [{ space_id: 's', space_key: 's', name: 'Private', created_by: null, status: 'active' }]
+    spaces.switchSpace('s')
+    vi.spyOn(spaces, 'fetchSpaces').mockImplementation(async () => { spaces.spaces = []; spaces.clearSpace() })
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 403, text: async () => 'Forbidden' }))
+    await new Promise<void>(resolve => {
+      sse.streamChat('session', 'question', { onChunk: vi.fn(), onDone: vi.fn(), onError: () => resolve() })
+    })
+    expect(spaces.currentSpace).toBeNull()
+  })
 
   it('streams a turn answer through the shared parser and dedicated route', async () => {
     const fetchMock = vi
@@ -105,10 +125,10 @@ describe('chat SSE streams', () => {
       expect.objectContaining({
         method: 'POST',
         body: undefined,
-        headers: expect.objectContaining({
-          'X-Tenant-Id': 'tenant-1',
+        headers: {
+          'Content-Type': 'application/json',
           Authorization: 'Bearer token-1',
-        }),
+        },
       }),
     )
     expect(onChunk).toHaveBeenCalledWith('答案')

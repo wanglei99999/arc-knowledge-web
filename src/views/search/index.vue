@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { Search, Target, Type, Combine, ArrowDownUp, ChevronRight } from 'lucide-vue-next'
 import { cn } from '@/lib/utils'
 import { debugSearch, search as searchApi } from '@/api/search'
@@ -32,6 +32,9 @@ const results = ref<SearchResult[]>([])
 const expanded = ref<string[]>([])
 
 const debugResult = ref<DebugResult | null>(null)
+let generation = 0
+watch(() => spacesStore.currentSpace?.space_id, () => { ++generation; results.value = []; debugResult.value = null; searched.value = false; loading.value = false })
+onUnmounted(() => { ++generation })
 const paramsOpen = ref(false)
 const debugParams = ref({
   top_k: 10,
@@ -94,16 +97,19 @@ function rankDelta(hit: DebugHit, finalIdx: number): number | null {
 }
 
 async function handleSearch() {
-  if (!query.value.trim()) return
+  if (!query.value.trim() || !spacesStore.currentSpace?.capabilities?.includes('space.read')) return
+  const version = ++generation
   loading.value = true
   searched.value = false
   try {
     if (view.value === 'pipeline') {
-      debugResult.value = await debugSearch({
+      const data = await debugSearch({
         query: query.value.trim(),
         space_id: spacesStore.currentSpace?.space_id ?? '',
         ...debugParams.value,
       })
+      if (version !== generation) return
+      debugResult.value = data
     } else {
       const data = await searchApi({
         q: query.value.trim(),
@@ -111,6 +117,7 @@ async function handleSearch() {
         top_k: topK.value,
         score_threshold: 0.0,
       })
+      if (version !== generation) return
       const chunkMap = new Map(data.chunks.map(c => [c.chunk_id, c]))
       results.value = data.hits.map(hit => ({
         chunk_id: hit.chunk_id,
@@ -125,10 +132,12 @@ async function handleSearch() {
         source: hit.source ?? 'vector',
       }))
     }
-  } finally {
-    expanded.value = []
-    loading.value = false
-    searched.value = true
+  } catch { /* HTTP interceptor reports the error. */ } finally {
+    if (version === generation) {
+      expanded.value = []
+      loading.value = false
+      searched.value = true
+    }
   }
 }
 

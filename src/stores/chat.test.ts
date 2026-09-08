@@ -100,6 +100,7 @@ function setupStore() {
     name: '知识库',
     status: 'active',
     created_by: 'user-1',
+    capabilities: ['space.read', 'document.upload'],
   }]
   spacesStore.switchSpace('space-1')
   const store = useChatStore()
@@ -115,6 +116,33 @@ function mockTurnIds() {
 }
 
 describe('chat store multi-session runtime', () => {
+  it.each(['poll-success', 'poll-error', 'resume-success', 'resume-error'])('discards %s after space revocation without recreating polling', async (mode) => {
+    vi.useFakeTimers()
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const store = setupStore()
+    chatApi.createChatTurn.mockResolvedValue(turn())
+    chatApi.uploadTurnAttachment.mockResolvedValue(turn())
+    chatApi.getChatTurn.mockResolvedValue(turn())
+    await store.switchSession('session-a')
+    await store.submitTurn('question', [new File(['x'], 'file.pdf')])
+    let resolve!: (value: ChatTurnVO) => void
+    let reject!: (reason: Error) => void
+    chatApi.getChatTurn.mockReset().mockReturnValue(new Promise<ChatTurnVO>((yes, no) => { resolve = yes; reject = no }))
+    let resuming: Promise<void> | undefined
+    if (mode.startsWith('resume')) resuming = store.resumePendingTurns()
+    else await vi.advanceTimersByTimeAsync(2000)
+    useSpacesStore().clearSpace()
+    await Promise.resolve()
+    if (mode.endsWith('success')) resolve(turn({ readiness: 'ready', processing_status: 'waiting_files' }))
+    else reject(new Error('revoked'))
+    await resuming
+    await vi.advanceTimersByTimeAsync(6000)
+    expect(chatApi.getChatTurn).toHaveBeenCalledTimes(1)
+    expect(store.messagesBySession).toEqual({})
+    expect(store.turnsBySession).toEqual({})
+    expect(streamApi.turn).not.toHaveBeenCalled()
+    expect(vi.getTimerCount()).toBe(0)
+  })
   beforeEach(() => {
     vi.useRealTimers()
     vi.restoreAllMocks()
@@ -239,6 +267,26 @@ describe('chat store multi-session runtime', () => {
       'session-a',
       'session-b',
     ])
+  })
+  it('blocks file turn creation for a viewer before creating any attachment records', async () => {
+    const store = setupStore()
+    await store.switchSession('session-a')
+    chatApi.createChatTurn.mockResolvedValue(turn())
+    chatApi.uploadTurnAttachment.mockResolvedValue(turn())
+    useSpacesStore().spaces[0].capabilities = ['space.read']
+    await store.submitTurn('question', [new File(['x'], 'file.pdf')])
+    expect(chatApi.createSession).not.toHaveBeenCalled()
+    expect(chatApi.createChatTurn).not.toHaveBeenCalled()
+  })
+  it('clears visible conversation and session list when its space becomes inaccessible', async () => {
+    const store = setupStore()
+    await store.switchSession('session-a')
+    store.messagesBySession['session-a'] = [{ id: 'msg', role: 'assistant', content: 'private answer', citations: [], created_at: '' }]
+    useSpacesStore().clearSpace()
+    await Promise.resolve()
+    expect(store.messages).toEqual([])
+    expect(store.sessions).toEqual([])
+    expect(store.activeSessionId).toBeNull()
   })
 
   it('renames a session without changing its order or pin state', async () => {

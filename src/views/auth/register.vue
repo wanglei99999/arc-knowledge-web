@@ -22,6 +22,7 @@
         <h2 class="text-xl font-semibold text-gray-800 mb-6">创建账号</h2>
 
         <a-form :model="form" layout="vertical" @finish="onSubmit">
+          <a-form-item label="新组织名称" name="tenant_name" :rules="[{ required: true, whitespace: true, message: '请输入组织名称' }]"><a-input v-model:value="form.tenant_name" size="large" /></a-form-item>
           <a-form-item
             label="邮箱"
             name="email"
@@ -89,7 +90,7 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const loading = ref(false)
-const form = reactive({ email: '', password: '', confirm: '' })
+const form = reactive({ email: '', password: '', confirm: '', tenant_name: '' })
 
 // 密码强度：根据长度和字符种类计算 1-3 级
 const strength = computed(() => {
@@ -111,7 +112,7 @@ function checkConfirm(_: unknown, value: string) {
 async function onSubmit() {
   loading.value = true
   try {
-    await authStore.register({ email: form.email, password: form.password })
+    await authStore.register({ email: form.email, password: form.password, tenant_name: form.tenant_name.trim() })
     message.success('注册成功，欢迎加入！')
     router.push({ name: 'dashboard' })
   } finally {

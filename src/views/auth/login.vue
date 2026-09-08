@@ -21,7 +21,11 @@
       <div class="bg-white rounded-2xl shadow-2xl shadow-black/30 border border-white/10 p-8">
         <h2 class="text-xl font-semibold text-gray-800 mb-6">欢迎回来</h2>
 
-        <a-form :model="form" layout="vertical" @finish="onSubmit">
+        <div v-if="authStore.selectionToken" class="space-y-3">
+          <p>请选择组织</p>
+          <a-button v-for="member in authStore.memberships" :key="member.tenant_id" block @click="authStore.switchTenant(member.tenant_id)">{{ member.tenant_name }} · {{ member.tenant_role }}</a-button>
+        </div>
+        <a-form v-else :model="form" layout="vertical" @finish="onSubmit">
           <a-form-item
             label="邮箱"
             name="email"
@@ -74,7 +78,7 @@ async function onSubmit() {
   loading.value = true
   try {
     await authStore.login(form)
-    router.push({ name: 'dashboard' })
+    if (authStore.isLoggedIn) router.push({ name: 'dashboard' })
   } finally {
     loading.value = false
   }

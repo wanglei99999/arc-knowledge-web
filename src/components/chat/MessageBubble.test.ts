@@ -31,6 +31,12 @@ function userMessage(file: AttachmentVO): MessageVO {
 }
 
 describe('MessageBubble attachments', () => {
+  it('hides file retry and add controls when upload permission is unavailable', () => {
+    const wrapper = mount(MessageBubble, { props: { message: userMessage(attachment({ status: 'failed' })), canUpload: false } as any })
+    expect(wrapper.find('button[aria-label="补充附件到本轮"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="重试 report.pdf"]').exists()).toBe(false)
+    expect(wrapper.find('button[aria-label="取消本轮"]').exists()).toBe(true)
+  })
   it('shows upload progress inside the user message', () => {
     const wrapper = mount(MessageBubble, {
       props: {

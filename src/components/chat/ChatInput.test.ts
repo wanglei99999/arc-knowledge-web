@@ -21,6 +21,7 @@ describe('ChatInput', () => {
       name: '知识库',
       status: 'active',
       created_by: 'user-1',
+      capabilities: ['space.read', 'document.upload'],
     }]
     spacesStore.switchSpace('space-1')
   })
@@ -37,6 +38,16 @@ describe('ChatInput', () => {
     expect(wrapper.get('textarea').attributes('disabled')).toBeUndefined()
     expect(wrapper.get('button[aria-label="停止生成"]').element.tagName).toBe('BUTTON')
     expect(wrapper.find('button[aria-label="发送"]').exists()).toBe(false)
+  })
+  it('rejects attachment selection for viewers but still permits ordinary chat', async () => {
+    useSpacesStore().spaces[0].capabilities = ['space.read']
+    const wrapper = mount(ChatInput, { props: { disabled: false, isStreaming: false, text: '普通问题' } })
+    const input = wrapper.get('input[type="file"]')
+    Object.defineProperty(input.element, 'files', { value: [new File(['x'], 'secret.pdf', { type: 'application/pdf' })] })
+    await input.trigger('change')
+    expect(wrapper.text()).not.toContain('secret.pdf')
+    await wrapper.get('button[aria-label="发送"]').trigger('click')
+    expect(wrapper.emitted('send')?.[0]).toEqual(['普通问题', []])
   })
 
   it('keeps drafting enabled but disables send while files are processing', () => {

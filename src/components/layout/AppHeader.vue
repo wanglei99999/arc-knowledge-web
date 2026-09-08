@@ -22,6 +22,7 @@ const breadcrumbMap: Record<string, string> = {
   '/chat':      '智能问答',
   '/search':    '检索调试',
   '/admin':     '管理配置',
+  '/permissions': '权限与组织',
   '/settings/archived-chats': '已归档聊天',
 }
 
@@ -55,6 +56,11 @@ async function handleLogout() {
     </div>
 
     <div class="flex items-center gap-xs">
+      <RouterLink to="/permissions" class="px-sm text-body-sm">权限与组织</RouterLink>
+      <select v-if="authStore.context" aria-label="切换组织" :value="authStore.context.tenant_id" class="rounded-sm border border-rule p-1 text-body-sm" @focus="authStore.loadTenants().catch(() => {})" @change="authStore.switchTenant(($event.target as HTMLSelectElement).value).catch(() => {})">
+        <option v-if="!authStore.memberships.length" :value="authStore.context.tenant_id">{{ authStore.context.tenant_name }}</option>
+        <option v-for="member in authStore.memberships" :key="member.tenant_id" :value="member.tenant_id">{{ member.tenant_name }}</option>
+      </select>
       <div class="relative">
         <button
           type="button"

@@ -1,7 +1,7 @@
 import http from '@/utils/http'
 import type { DocumentListResult, ChunkListResult } from '@/types/document'
 
-export const listDocuments = (params?: { space_id?: string; limit?: number; offset?: number }) =>
+export const listDocuments = (params: { space_id: string; limit?: number; offset?: number }) =>
   http.get<DocumentListResult>('/documents', { params })
 
 export const uploadDocument = (file: File, spaceId: string, onProgress?: (pct: number) => void) => {
@@ -23,3 +23,5 @@ export const listChunks = (documentId: string) =>
 
 export const deleteDocument = (documentId: string) =>
   http.delete(`/documents/${documentId}`)
+
+export const retryDocument = (documentId: string) => http.post(`/documents/${documentId}/retry`)

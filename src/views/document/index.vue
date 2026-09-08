@@ -5,7 +5,7 @@ import { RefreshCw, FileText, Layers } from 'lucide-vue-next'
 import dayjs from 'dayjs'
 import UploadZone from '@/components/document/UploadZone.vue'
 import StatusBadge from '@/components/document/StatusBadge.vue'
-import { listDocuments, uploadDocument, deleteDocument, listChunks } from '@/api/document'
+import { listDocuments, uploadDocument, deleteDocument, listChunks, retryDocument } from '@/api/document'
 import type { DocumentVO, ChunkVO } from '@/types/document'
 import { useSpacesStore } from '@/stores/spaces'
 
@@ -15,15 +15,21 @@ const spacesStore = useSpacesStore()
 const documents = ref<DocumentVO[]>([])
 const total     = ref(0)
 const loading   = ref(false)
+let generation = 0
+let mounted = true
 
 async function fetchDocuments() {
+  const id = spacesStore.currentSpace?.space_id
+  const version = ++generation
+  if (!mounted || !id) { documents.value = []; total.value = 0; return }
   loading.value = true
   try {
-    const res = await listDocuments({ space_id: spacesStore.currentSpace?.space_id ?? '', limit: 50 })
+    const res = await listDocuments({ space_id: id, limit: 50 })
+    if (!mounted || version !== generation || spacesStore.currentSpace?.space_id !== id) return
     documents.value = res.items
     total.value     = res.total
-  } finally {
-    loading.value = false
+  } catch { /* HTTP interceptor reports the error. */ } finally {
+    if (version === generation) loading.value = false
   }
 }
 
@@ -46,20 +52,26 @@ function stopPolling() {
   if (pollTimer) { clearInterval(pollTimer); pollTimer = null }
 }
 
-onUnmounted(stopPolling)
-watch(() => spacesStore.currentSpace?.space_id, fetchDocuments)
+onUnmounted(() => { mounted = false; ++generation; stopPolling() })
+watch(() => spacesStore.currentSpace?.space_id, () => {
+  stopPolling(); documents.value = []; total.value = 0; chunks.value = []; drawerVisible.value = false; drawerDoc.value = null; uploadTasks.value = []
+  void fetchDocuments()
+})
 
 // ── 上传 ─────────────────────────────────────────────────────────────────────
 interface UploadTask { file: File; progress: number; status: 'uploading' | 'done' | 'error' }
 const uploadTasks = ref<UploadTask[]>([])
 
 async function handleUpload(files: File[]) {
+  const id = spacesStore.currentSpace?.space_id
+  if (!id || !spacesStore.currentSpace?.capabilities?.includes('document.upload')) return
   for (const file of files) {
+    if (!mounted || spacesStore.currentSpace?.space_id !== id) return
     const task: UploadTask = { file, progress: 0, status: 'uploading' }
     uploadTasks.value.push(task)
 
     try {
-      await uploadDocument(file, spacesStore.currentSpace?.space_id ?? '', (pct) => { task.progress = pct })
+      await uploadDocument(file, id, (pct) => { task.progress = pct })
       task.status = 'done'
       message.success(`${file.name} 上传成功，正在入库处理`)
     } catch {
@@ -70,6 +82,7 @@ async function handleUpload(files: File[]) {
 
   // 上传完成后刷新列表，并在有文档处理中时启动轮询
   setTimeout(async () => {
+    if (!mounted || spacesStore.currentSpace?.space_id !== id) return
     uploadTasks.value = uploadTasks.value.filter(t => t.status !== 'done')
     await fetchDocuments()
     if (documents.value.some(d => !TERMINAL_STATUSES.has(d.status))) startPolling()
@@ -85,6 +98,7 @@ const asDoc = (record: Record<string, unknown>) => record as unknown as Document
 
 // ── 删除 ─────────────────────────────────────────────────────────────────────
 function confirmDelete(doc: DocumentVO) {
+  if (!doc.capabilities?.includes('document.delete')) return
   Modal.confirm({
     title: '确认删除',
     content: `删除「${doc.original_name}」将同时清除向量索引和全文索引，此操作不可恢复。`,
@@ -106,13 +120,15 @@ const chunks         = ref<ChunkVO[]>([])
 const chunksLoading  = ref(false)
 
 async function openChunks(doc: DocumentVO) {
+  const id = spacesStore.currentSpace?.space_id
   drawerDoc.value    = doc
   drawerVisible.value = true
   chunksLoading.value = true
   try {
     const res = await listChunks(doc.id)
+    if (!mounted || spacesStore.currentSpace?.space_id !== id || drawerDoc.value?.id !== doc.id) return
     chunks.value = res.items
-  } finally {
+  } catch { /* HTTP interceptor reports the error. */ } finally {
     chunksLoading.value = false
   }
 }
@@ -159,7 +175,8 @@ function mimeLabel(mime: string) {
     </div>
 
     <!-- 上传区 -->
-    <UploadZone @upload="handleUpload" />
+    <UploadZone v-if="spacesStore.currentSpace?.capabilities?.includes('document.upload')" @upload="handleUpload" />
+    <p v-else class="text-sm text-zinc-500">{{ spacesStore.currentSpace ? '当前空间为只读，无法上传文档。' : '请选择可访问的知识空间。' }}</p>
 
     <!-- 上传进度条 -->
     <div v-if="uploadTasks.length" class="space-y-2">
@@ -239,11 +256,13 @@ function mimeLabel(mime: string) {
               </button>
               <span class="text-zinc-200">|</span>
               <button
+                v-if="record.capabilities?.includes('document.delete')"
                 class="text-xs text-zinc-400 hover:text-red-500 transition-colors"
                 @click="confirmDelete(asDoc(record))"
               >
                 删除
               </button>
+              <button v-if="record.capabilities?.includes('document.retry')" class="text-xs" @click="retryDocument(record.id).then(fetchDocuments).catch(() => {})">重试</button>
             </div>
           </template>
         </template>

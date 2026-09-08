@@ -1,4 +1,4 @@
-import { useAppStore } from '@/stores/app'
+import { contextSignal } from './context'
 import { useAuthStore } from '@/stores/auth'
 import { useSpacesStore } from '@/stores/spaces'
 import type { Citation } from '@/types/chat'
@@ -17,14 +17,16 @@ function consumeChatStream(
   callbacks: StreamCallbacks,
 ): () => void {
   const controller = new AbortController()
-  const appStore = useAppStore()
+  const identitySignal = contextSignal()
+  if (identitySignal.aborted) return () => {}
+  const abort = () => controller.abort()
+  identitySignal.addEventListener('abort', abort, { once: true })
   const authStore = useAuthStore()
 
   ;(async () => {
     try {
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
-        'X-Tenant-Id': appStore.tenantId,
       }
       if (authStore.accessToken) {
         headers['Authorization'] = `Bearer ${authStore.accessToken}`
@@ -38,6 +40,7 @@ function consumeChatStream(
       })
 
       if (!res.ok) {
+        if (res.status === 403 || res.status === 404) await useSpacesStore().fetchSpaces().catch(() => {})
         const text = await res.text().catch(() => res.statusText)
         throw new Error(`HTTP ${res.status}: ${text}`)
       }
@@ -52,6 +55,7 @@ function consumeChatStream(
 
       while (true) {
         const { done, value } = await reader.read()
+        if (controller.signal.aborted) return
         if (done) break
 
         buffer += decoder.decode(value, { stream: true })
@@ -97,6 +101,8 @@ function consumeChatStream(
     } catch (err) {
       if ((err as Error).name === 'AbortError') return
       callbacks.onError(err instanceof Error ? err : new Error(String(err)))
+    } finally {
+      identitySignal.removeEventListener('abort', abort)
     }
   })()
 

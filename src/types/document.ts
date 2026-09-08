@@ -22,6 +22,8 @@ export interface DocumentVO {
   error_message: string | null
   created_at: string
   updated_at: string
+  created_by_membership_id?: string | null
+  capabilities?: string[]
 }
 
 export interface ChunkVO {

@@ -1,7 +1,8 @@
 import axios, { type AxiosError, type AxiosInstance, type AxiosRequestConfig } from 'axios'
 import { message } from 'ant-design-vue'
-import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
+import { useSpacesStore } from '@/stores/spaces'
+import { contextSignal, invalidateContext } from './context'
 
 /**
  * 这个实例的响应拦截器把 `res.data` 拆了出来（见下方 `(res) => res.data`），
@@ -31,10 +32,9 @@ const http = axios.create({
 
 // 请求拦截：注入租户 Header 和 Bearer Token
 http.interceptors.request.use((config) => {
-  const appStore = useAppStore()
   const authStore = useAuthStore()
-  config.headers['X-Tenant-Id'] = appStore.tenantId
-  if (authStore.accessToken) {
+  if (config.url !== '/auth/logout') config.signal = contextSignal()
+  if (authStore.accessToken && !config.headers['Authorization']) {
     config.headers['Authorization'] = `Bearer ${authStore.accessToken}`
   }
   return config
@@ -52,16 +52,30 @@ http.interceptors.response.use(
   (res) => res.data,
   async (error: AxiosError<{ detail?: string }>) => {
     const authStore = useAuthStore()
-    if (error.response?.status === 401 && authStore.refreshToken) {
+    if (axios.isCancel(error)) return Promise.reject(error)
+    const config = error.config as (typeof error.config & { retried?: boolean })
+    if (error.response?.status === 401 && authStore.refreshToken && !config?.retried && !config?.url?.startsWith('/auth/')) {
       try {
+        config!.retried = true
         await authStore.refresh()
-        const config = error.config!
-        config.headers['Authorization'] = `Bearer ${authStore.accessToken}`
-        return http(config)
+        config!.headers['Authorization'] = `Bearer ${authStore.accessToken}`
+        return http(config!)
       } catch {
         await authStore.logout()
-        window.location.href = '/login'
         return Promise.reject(error)
+      }
+    }
+    if (error.response?.status === 401 && !config?.url?.startsWith('/auth/')) {
+      await authStore.logout()
+      return Promise.reject(error)
+    }
+    if ((error.response?.status === 403 || error.response?.status === 404) && !config?.url?.startsWith('/auth/') && config?.url !== '/spaces' && !config?.url?.startsWith('/tenant/') && !config?.url?.startsWith('/groups')) {
+      const spaces = useSpacesStore()
+      const selected = spaces.currentSpace?.space_id
+      await spaces.fetchSpaces().catch(() => {})
+      if (selected && !spaces.currentSpace) {
+        invalidateContext()
+        window.location.replace('/')
       }
     }
     const raw = error.response?.data?.detail ?? '请求失败，请稍后重试'

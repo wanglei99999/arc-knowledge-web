@@ -23,6 +23,7 @@ import {
 } from '@/api/chat'
 import { useSpacesStore } from '@/stores/spaces'
 import { useAppStore } from '@/stores/app'
+import { contextSignal } from '@/utils/context'
 import type {
   AttachmentDeclaration,
   AttachmentVO,
@@ -132,6 +133,11 @@ export const useChatStore = defineStore('chat', () => {
 
   // AbortController、定时器和 File 都不属于界面状态，不能进入 Pinia/localStorage。
   const runtimeBySession = new Map<string, SessionRuntime>()
+  let runtimeGeneration = 0
+  function isRuntimeCurrent(sessionId: string, runtime: SessionRuntime, generation: number) {
+    return !contextSignal().aborted && Boolean(spacesStore.currentSpace)
+      && generation === runtimeGeneration && runtimeBySession.get(sessionId) === runtime
+  }
   const titleRevisionBySession = new Map<string, number>()
   const retryHydrationInFlight = new Set<string>()
 
@@ -154,6 +160,7 @@ export const useChatStore = defineStore('chat', () => {
   ))
 
   function persistRuntime() {
+    if (contextSignal().aborted) return
     const value: PersistedChatRuntime = {
       drafts: draftsBySession.value,
       notifications: notificationsBySession.value,
@@ -303,10 +310,12 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function schedulePoll(sessionId: string, turnId: string) {
-    const runtime = runtimeOf(sessionId)
-    if (runtime.pollTimer) return
+    const runtime = runtimeBySession.get(sessionId)
+    const generation = runtimeGeneration
+    if (!runtime || !isRuntimeCurrent(sessionId, runtime, generation) || runtime.pollTimer) return
     runtime.pollTimer = setTimeout(() => {
       runtime.pollTimer = null
+      if (!isRuntimeCurrent(sessionId, runtime, generation)) return
       void pollTurn(sessionId, turnId)
     }, pollDelay())
   }
@@ -338,15 +347,17 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function pollTurn(sessionId: string, turnId: string) {
-    const runtime = runtimeOf(sessionId)
-    if (runtime.pollInFlight) return
+    const runtime = runtimeBySession.get(sessionId)
+    const generation = runtimeGeneration
+    if (!runtime || !isRuntimeCurrent(sessionId, runtime, generation) || runtime.pollInFlight) return
     runtime.pollInFlight = true
     try {
       const turn = await getChatTurn(turnId)
+      if (!isRuntimeCurrent(sessionId, runtime, generation)) return
       applyTurn(sessionId, turn)
       continueTurn(sessionId, turn)
     } catch {
-      schedulePoll(sessionId, turnId)
+      if (isRuntimeCurrent(sessionId, runtime, generation)) schedulePoll(sessionId, turnId)
     } finally {
       runtime.pollInFlight = false
     }
@@ -427,16 +438,18 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function fetchSessions() {
+    const spaceId = spacesStore.currentSpace?.space_id
+    if (!spaceId || contextSignal().aborted) { sessions.value = []; return }
     sessionsLoading.value = true
     try {
-      sessions.value = sortSessions(
-        await listSessions(spacesStore.currentSpace?.space_id),
-      )
+      const rows = await listSessions(spaceId)
+      if (contextSignal().aborted || spacesStore.currentSpace?.space_id !== spaceId) return
+      sessions.value = sortSessions(rows)
       if (sessions.value.length && !activeSessionId.value) {
         await switchSession(sessions.value[0].id)
       }
       await resumePendingTurns()
-    } finally {
+    } catch { /* HTTP interceptor reports the error. */ } finally {
       sessionsLoading.value = false
     }
   }
@@ -659,6 +672,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function submitTurn(content: string, files: File[]) {
+    if (!spacesStore.currentSpace?.capabilities?.includes('document.upload')) return
     const query = content.trim()
     if (!query || files.length === 0) return
 
@@ -806,6 +820,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function retryAttachment(turnId: string, attachmentId: string) {
+    if (!spacesStore.currentSpace?.capabilities?.includes('document.upload')) return
     const context = findTurnContext(turnId)
     const attachment = context?.turn.attachments
       .find(item => item.attachment_id === attachmentId)
@@ -834,6 +849,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function retryUpload(turnId: string, attachmentId: string, file: File) {
+    if (!spacesStore.currentSpace?.capabilities?.includes('document.upload')) return
     const context = findTurnContext(turnId)
     const attachment = context?.turn.attachments
       .find(item => item.attachment_id === attachmentId)
@@ -892,6 +908,7 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function addAttachments(turnId: string, files: File[]) {
+    if (!spacesStore.currentSpace?.capabilities?.includes('document.upload')) return
     const context = findTurnContext(turnId)
     if (!context
       || !files.length
@@ -958,14 +975,18 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   async function resumePendingTurns() {
+    if (contextSignal().aborted || !spacesStore.currentSpace) return
+    const generation = runtimeGeneration
     await Promise.all(Object.entries(pendingTurnsBySession.value).map(
       async ([sessionId, turnId]) => {
+        const runtime = runtimeOf(sessionId)
         try {
           const turn = await getChatTurn(turnId)
+          if (!isRuntimeCurrent(sessionId, runtime, generation)) return
           applyTurn(sessionId, turn)
           continueTurn(sessionId, turn)
         } catch {
-          schedulePoll(sessionId, turnId)
+          if (isRuntimeCurrent(sessionId, runtime, generation)) schedulePoll(sessionId, turnId)
         }
       },
     ))
@@ -988,11 +1009,16 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   watch(() => spacesStore.currentSpace?.space_id, async (newId, oldId) => {
-    if (!newId || newId === oldId) return
+    if (newId === oldId) return
+    if (!newId) { resetVisibleContext(); return }
 
     if (!oldId) {
-      sessions.value = sortSessions(await listSessions(newId))
-      await resumePendingTurns()
+      try {
+        const rows = await listSessions(newId)
+        if (contextSignal().aborted || spacesStore.currentSpace?.space_id !== newId) return
+        sessions.value = sortSessions(rows)
+        await resumePendingTurns()
+      } catch { /* HTTP interceptor reports the error. */ }
       return
     }
 
@@ -1000,6 +1026,20 @@ export const useChatStore = defineStore('chat', () => {
     activeSessionId.value = null
     await fetchSessions()
   })
+
+  function resetVisibleContext() {
+    ++runtimeGeneration
+    for (const runtime of runtimeBySession.values()) {
+      runtime.stopStream?.()
+      if (runtime.pollTimer) clearTimeout(runtime.pollTimer)
+    }
+    runtimeBySession.clear()
+    activeSessionId.value = null; sessions.value = []; messagesBySession.value = {}
+    turnsBySession.value = {}; draftsBySession.value = {}; notificationsBySession.value = {}
+    pendingTurnsBySession.value = {}; streamingBySession.value = {}; submittingBySession.value = {}
+    pendingNew.value = false
+  }
+  contextSignal().addEventListener('abort', resetVisibleContext, { once: true })
 
   return {
     sessions,

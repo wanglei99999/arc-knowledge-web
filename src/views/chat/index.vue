@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch, nextTick, onMounted } from 'vue'
 import { useChatStore } from '@/stores/chat'
+import { useSpacesStore } from '@/stores/spaces'
 import MessageBubble from '@/components/chat/MessageBubble.vue'
 import ChatInput from '@/components/chat/ChatInput.vue'
 import { Compass, Combine, Quote, SearchX } from 'lucide-vue-next'
 
 const store = useChatStore()
+const spaces = useSpacesStore()
 const messagesEl = ref<HTMLElement | null>(null)
 const inputEl = ref<InstanceType<typeof ChatInput> | null>(null)
 
@@ -111,6 +113,7 @@ onMounted(() => scrollToBottom(false))
           v-for="msg in store.messages"
           :key="msg.id"
           :message="msg"
+          :can-upload="spaces.currentSpace?.capabilities?.includes('document.upload') ?? false"
           @retry-attachment="store.retryAttachment"
           @retry-upload="store.retryUpload"
           @ignore-attachment="store.ignoreAttachment"

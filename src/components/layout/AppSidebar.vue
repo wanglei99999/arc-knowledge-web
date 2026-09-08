@@ -2,6 +2,9 @@
 import { h, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import { permissionsApi } from '@/api/permissions'
+import type { Group } from '@/api/permissions'
 import { useSpacesStore } from '@/stores/spaces'
 import { useChatStore } from '@/stores/chat'
 import SessionRow from '@/components/layout/SessionRow.vue'
@@ -22,6 +25,12 @@ import { cn } from '@/lib/utils'
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
+const auth = useAuthStore()
+const preset = ref<'private' | 'group' | 'public'>('private')
+const groupId = ref('')
+const groupRole = ref<'VIEWER' | 'EDITOR'>('VIEWER')
+const groups = ref<Group[]>([])
+async function loadSharingGroups() { groups.value = (await permissionsApi.directory()).groups }
 const spacesStore = useSpacesStore()
 const chatStore = useChatStore()
 
@@ -128,7 +137,8 @@ async function handleCreateSpace() {
   if (!name || creating.value) return
   creating.value = true
   try {
-    await spacesStore.createSpace(name)
+    if (preset.value === 'group' && !groupId.value) { message.error('请选择团队'); return }
+    await spacesStore.createSpace({ name, preset: preset.value, ...(preset.value === 'group' ? { group_id: groupId.value, group_role: groupRole.value } : {}) })
     composingSpace.value = false
     newSpaceName.value = ''
   } finally {
@@ -215,6 +225,8 @@ async function handleCreateSpace() {
       </div>
 
       <div v-if="composingSpace" class="shrink-0 px-sm pb-xs">
+        <select v-model="preset" aria-label="新空间可见范围" class="w-full p-1 mb-1" @change="preset === 'group' && loadSharingGroups()"><option value="private">私有 · 仅自己</option><option value="group">团队共享</option><option v-if="auth.isAdmin" value="public">组织公开</option></select>
+        <template v-if="preset === 'group'"><select v-model="groupId" aria-label="新空间团队" class="w-full p-1"><option value="">选择团队</option><option v-for="g in groups" :key="g.id" :value="g.id">{{ g.name }}</option></select><select v-model="groupRole" aria-label="新空间团队角色" class="w-full p-1"><option>VIEWER</option><option>EDITOR</option></select></template>
         <input
           v-model="newSpaceName"
           placeholder="空间名，Enter 建立"
@@ -245,6 +257,7 @@ async function handleCreateSpace() {
             <Folder v-else class="h-4 w-4 shrink-0" :stroke-width="1.5" />
             <span class="min-w-0 flex-1 truncate">{{ space.name }}</span>
             <button
+              v-if="space.capabilities?.includes('space.manage')"
               type="button"
               :aria-label="`删除空间 ${space.name}`"
               class="hidden shrink-0 rounded-xs p-[2px] text-graphite-45 hover:text-alert-ink group-hover:block"
@@ -307,6 +320,7 @@ async function handleCreateSpace() {
 
     <div class="shrink-0 border-t border-rule p-sm">
       <RouterLink
+        v-if="auth.isAdmin"
         to="/admin"
         :class="cn(
           'flex h-8 items-center rounded-sm px-sm text-label',

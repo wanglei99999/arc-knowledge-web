@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, nextTick } from 'vue'
+import { ref, computed, nextTick, watch } from 'vue'
 import { ArrowUp, Square, Plus, X, Paperclip, Library, Check } from 'lucide-vue-next'
 import { useSpacesStore } from '@/stores/spaces'
 import { useChatStore } from '@/stores/chat'
@@ -32,6 +32,7 @@ const fileEl = ref<HTMLInputElement | null>(null)
 const menu = ref<'add' | 'space' | null>(null)
 
 const space = computed(() => spacesStore.currentSpace)
+const canUpload = computed(() => space.value?.capabilities?.includes('document.upload') ?? false)
 
 /**
  * 空间是会话的属性，在建立那一刻定下来。所以抬头只在新建对话时出现：
@@ -46,7 +47,7 @@ const isNewConversation = computed(() => !chatStore.activeSessionId)
  */
 const canSend = computed(() =>
   Boolean(text.value.trim())
-    && Boolean(space.value)
+    && Boolean(space.value?.capabilities?.includes('space.read'))
     && !props.disabled
     && !props.sendDisabled,
 )
@@ -57,6 +58,7 @@ interface PendingAttachment {
   file: File
 }
 const pendingAttachments = ref<PendingAttachment[]>([])
+watch([() => space.value?.space_id, canUpload], () => { pendingAttachments.value = [] })
 
 function dismiss(id: string) {
   pendingAttachments.value = pendingAttachments.value.filter(item => item.id !== id)
@@ -64,6 +66,7 @@ function dismiss(id: string) {
 
 function onPick(e: Event) {
   const input = e.target as HTMLInputElement
+  if (!canUpload.value) { input.value = ''; return }
   const selected = Array.from(input.files ?? [])
     .filter(isAccepted)
     .map(file => ({
@@ -75,6 +78,7 @@ function onPick(e: Event) {
 }
 
 function pickFiles() {
+  if (!canUpload.value) return
   menu.value = null
   fileEl.value?.click()
 }
@@ -91,7 +95,7 @@ function clearSpace() {
 
 function handleSend() {
   if (!canSend.value) return
-  emit('send', text.value.trim(), pendingAttachments.value.map(item => item.file))
+  emit('send', text.value.trim(), canUpload.value ? pendingAttachments.value.map(item => item.file) : [])
   text.value = ''
   pendingAttachments.value = []
   nextTick(resize)
@@ -140,7 +144,7 @@ defineExpose({ fill })
           <p class="px-sm py-xs text-meta text-graphite-45">添加</p>
           <button
             type="button"
-            :disabled="!space"
+            :disabled="!canUpload"
             :class="cn(
               'flex h-[30px] w-full items-center gap-sm rounded-sm px-sm text-body-sm',
               'transition-colors duration-hover ease-settle motion-reduce:transition-none',

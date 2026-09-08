@@ -8,7 +8,7 @@ import MessageAttachment from './MessageAttachment.vue'
 import TurnRecoveryActions from './TurnRecoveryActions.vue'
 import type { MessageVO } from '@/types/chat'
 
-const props = defineProps<{ message: MessageVO }>()
+const props = withDefaults(defineProps<{ message: MessageVO; canUpload?: boolean }>(), { canUpload: true })
 
 const emit = defineEmits<{
   retryAttachment: [turnId: string, attachmentId: string]
@@ -38,7 +38,7 @@ const showTurnRecovery = computed(() => (
           v-for="attachment in message.attachments"
           :key="attachment.attachment_id"
           :attachment="attachment"
-          :actions-enabled="message.processing_status === 'waiting_files'"
+          :actions-enabled="canUpload && message.processing_status === 'waiting_files'"
           @retry="emit('retryAttachment', props.message.id, $event)"
           @retry-upload="(attachmentId, file) => emit('retryUpload', props.message.id, attachmentId, file)"
           @ignore="emit('ignoreAttachment', props.message.id, $event)"
@@ -47,6 +47,7 @@ const showTurnRecovery = computed(() => (
       <TurnRecoveryActions
         v-if="showTurnRecovery"
         :turn-id="message.id"
+        :can-upload="canUpload"
         @add-attachments="emit('addAttachments', props.message.id, $event)"
         @cancel="emit('cancelTurn', props.message.id)"
       />

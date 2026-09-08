@@ -4,7 +4,7 @@ import { Ban, Paperclip } from 'lucide-vue-next'
 
 import { ACCEPTED_MIME, isAccepted } from '@/lib/file-types'
 
-defineProps<{ turnId: string }>()
+const props = withDefaults(defineProps<{ turnId: string; canUpload?: boolean }>(), { canUpload: true })
 
 const emit = defineEmits<{
   addAttachments: [files: File[]]
@@ -14,6 +14,7 @@ const emit = defineEmits<{
 const fileEl = ref<HTMLInputElement | null>(null)
 
 function onPick(event: Event) {
+  if (!props.canUpload) return
   const input = event.target as HTMLInputElement
   const files = Array.from(input.files ?? []).filter(isAccepted)
   if (files.length) emit('addAttachments', files)
@@ -26,6 +27,7 @@ function onPick(event: Event) {
     <p class="text-meta text-graphite-45">本轮暂时没有可用于回答的附件。</p>
     <div class="mt-xs flex flex-wrap gap-xs">
       <button
+        v-if="canUpload"
         type="button"
         aria-label="补充附件到本轮"
         class="inline-flex h-7 items-center gap-xs rounded-sm border border-rule bg-paper px-sm text-meta text-graphite-70 transition-colors duration-hover ease-settle hover:border-rule-strong hover:text-graphite motion-reduce:transition-none"
